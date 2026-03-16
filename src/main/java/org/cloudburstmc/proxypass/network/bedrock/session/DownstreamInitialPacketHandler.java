@@ -3,6 +3,8 @@ package org.cloudburstmc.proxypass.network.bedrock.session;
 import dev.kastle.netty.channel.nethernet.NetherNetChannel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+
+import org.cloudburstmc.protocol.bedrock.BedrockSession;
 import org.cloudburstmc.protocol.bedrock.data.PacketCompressionAlgorithm;
 import org.cloudburstmc.protocol.bedrock.packet.*;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
@@ -14,6 +16,9 @@ import org.jose4j.json.internal.json_simple.JSONObject;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwx.HeaderParameterNames;
 import org.jose4j.lang.JoseException;
+
+import com.ihsanharh.hiveutils.DownstreamModManager;
+import com.ihsanharh.hiveutils.UpstreamModManager;
 
 import javax.crypto.SecretKey;
 import java.security.InvalidKeyException;
@@ -68,8 +73,10 @@ public class DownstreamInitialPacketHandler implements BedrockPacketHandler {
         this.session.sendPacketImmediately(clientToServerHandshake);
         this.player.logger.logPacket(this.session, clientToServerHandshake, true);
 
+        BedrockSession upstreamSession = this.player.getUpstream();
+        UpstreamModManager upstreamHandler = (UpstreamModManager) upstreamSession.getPacketHandler();
 
-        this.session.setPacketHandler(new DownstreamPacketHandler(this.session, this.player, this.proxy));
+        this.session.setPacketHandler(new DownstreamModManager(this.session, this.player, this.proxy, upstreamHandler.getActiveMods()));
         log.debug("Downstream connected");
         return PacketSignal.HANDLED;
     }

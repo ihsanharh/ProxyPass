@@ -1,11 +1,11 @@
 ## Address proxy will bind to.
 proxy:
   host: 127.0.0.1
-  port: 19122
+  port: 19132
 ## Destination server which the client will connect to.
 ## You are only able to join offline mode servers
 destination:
-  host: 127.0.0.1
+  host: sg.hivebedrock.network
   port: 19132
 ## Run the proxy in online mode. This will require login with a Microsoft account on start.
 online-mode: true

@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.ihsanharh.hiveutils.UpstreamModManager;
+
 import dev.kastle.netty.channel.nethernet.NetherNetChannelFactory;
 import dev.kastle.netty.channel.nethernet.config.NetherChannelOption;
 import dev.kastle.netty.channel.nethernet.config.NetherNetAddress;
@@ -59,7 +61,6 @@ import org.cloudburstmc.proxypass.network.bedrock.session.Account;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyClientSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyServerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ServerAddress;
-import org.cloudburstmc.proxypass.network.bedrock.session.UpstreamPacketHandler;
 import org.cloudburstmc.proxypass.network.bedrock.util.NbtBlockDefinitionRegistry;
 import org.cloudburstmc.proxypass.network.bedrock.util.UnknownBlockDefinitionRegistry;
 import org.cloudburstmc.proxypass.ui.PacketInspector;
@@ -299,7 +300,7 @@ public class ProxyPass {
 
                         @Override
                         protected void initSession(ProxyServerSession session) {
-                            session.setPacketHandler(new UpstreamPacketHandler(session, ProxyPass.this, account));
+                            session.setPacketHandler(new UpstreamModManager(session, ProxyPass.this, account));
                         }
                     })
                     .bind(this.proxyAddress)
@@ -335,7 +336,7 @@ public class ProxyPass {
 
                         @Override
                         protected void initSession(ProxyServerSession session) {
-                            session.setPacketHandler(new UpstreamPacketHandler(session, ProxyPass.this, account));
+                            session.setPacketHandler(new UpstreamModManager(session, ProxyPass.this, account));
                         }
                     })
                     .bind(this.proxyAddress)

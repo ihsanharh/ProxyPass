@@ -230,3 +230,4 @@ packet-logs/
 packet-logs/*
 data/
 sessions/
+auth.json
