@@ -51,7 +51,6 @@ public class HideAndSeekESP implements ProxyMod {
 
         session.getUpstream().sendPacketImmediately(addEntityPacket);
         nametags.put(runtimeId, entityId);
-        log.info(addEntityPacket.toString());
     }
 
     private void despawnNametag(ProxyPlayerSession session, Long runtimeId) {
@@ -67,12 +66,11 @@ public class HideAndSeekESP implements ProxyMod {
     }
 
     private void cleanup(ProxyPlayerSession session) {
-        for (Long nametagId : this.nametags.values()) {
-            this.despawnNametag(session, nametagId);
+        for (Long runtimeId : this.nametags.keySet()) {
+            this.despawnNametag(session, runtimeId);
         }
 
         this.players.clear();
-        this.nametags.clear();
 
         log.info("hide and seek cleaned up: {} players & {} nametags", this.players.size(), this.nametags.size());
     }
@@ -83,7 +81,7 @@ public class HideAndSeekESP implements ProxyMod {
         PlayerStore playerStore = PlayerStore.getInstance();
 
         if (!serverStore.getCurrentServerName().contains("HIDE")) {
-            if (nametags.size() >= 1) {
+            if (this.ongoing || !this.nametags.isEmpty()) {
                 this.ongoing = false;
                 this.cleanup(session);
             }
