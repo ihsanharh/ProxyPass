@@ -60,7 +60,7 @@ public class UpstreamModManager extends UpstreamPacketHandler {
         PacketSignal originalSignal = super.handlePacket(packet);
 
         if (finalResult == ModResult.MODIFIED) {
-            playerSession.getDownstream().sendPacketImmediately(packet);
+            playerSession.getDownstream().sendPacket(packet);
 
             return PacketSignal.HANDLED; // we already sent the modified packet, block the original
         }

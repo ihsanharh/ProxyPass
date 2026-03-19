@@ -16,7 +16,8 @@ public class DownstreamModManager extends DownstreamPacketHandler {
     private final List<ProxyMod> activeMods;
     private final ProxyPlayerSession player;
 
-    public DownstreamModManager(ProxyClientSession session, ProxyPlayerSession player, ProxyPass proxy, List<ProxyMod> activeMods) {
+    public DownstreamModManager(ProxyClientSession session, ProxyPlayerSession player, ProxyPass proxy,
+            List<ProxyMod> activeMods) {
         super(session, player, proxy);
         this.player = player;
         this.activeMods = activeMods;
@@ -40,7 +41,7 @@ public class DownstreamModManager extends DownstreamPacketHandler {
         PacketSignal originalSignal = super.handlePacket(packet);
 
         if (finalResult == ModResult.MODIFIED) {
-            this.player.getUpstream().sendPacketImmediately(packet);
+            this.player.getUpstream().sendPacket(packet);
 
             return PacketSignal.HANDLED; // we already sent the modified packet, block the original
         }
