@@ -16,8 +16,8 @@ import org.cloudburstmc.protocol.bedrock.packet.RemoveEntityPacket;
 import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.PlayerData;
 import com.ihsanharh.hiveutils.core.PlayerStore;
 import com.ihsanharh.hiveutils.core.ServerStore;
@@ -25,7 +25,7 @@ import com.ihsanharh.hiveutils.core.ServerStore;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class HideAndSeekESP implements ProxyMod {
+public class HideAndSeekESP extends BaseMod {
     private Map<String, Long> players = new ConcurrentHashMap<>();
     private Map<Long, Long> nametags = new ConcurrentHashMap<>();
     private Boolean ongoing = false;

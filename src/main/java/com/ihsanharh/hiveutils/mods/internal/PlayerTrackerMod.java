@@ -1,4 +1,4 @@
-package com.ihsanharh.hiveutils.mods;
+package com.ihsanharh.hiveutils.mods.internal;
 
 import org.cloudburstmc.protocol.bedrock.packet.AddPlayerPacket;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
@@ -34,7 +34,8 @@ public class PlayerTrackerMod implements ProxyMod {
         }
 
         if (packet instanceof AddPlayerPacket addPlayerPacket) {
-            playerStore.addPlayer(addPlayerPacket.getUuid().toString(), addPlayerPacket.getUsername(), addPlayerPacket.getRuntimeEntityId(), addPlayerPacket.getPosition());
+            playerStore.addPlayer(addPlayerPacket.getUuid().toString(), addPlayerPacket.getUsername(),
+                    addPlayerPacket.getRuntimeEntityId(), addPlayerPacket.getPosition());
         }
 
         if (packet instanceof MoveEntityAbsolutePacket moveEntityPacket) {

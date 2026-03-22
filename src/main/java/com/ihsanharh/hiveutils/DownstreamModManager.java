@@ -9,18 +9,19 @@ import org.cloudburstmc.proxypass.network.bedrock.session.DownstreamPacketHandle
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyClientSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
+import com.ihsanharh.hiveutils.core.ModRegistry;
 
 public class DownstreamModManager extends DownstreamPacketHandler {
     private final List<ProxyMod> activeMods;
     private final ProxyPlayerSession player;
 
-    public DownstreamModManager(ProxyClientSession session, ProxyPlayerSession player, ProxyPass proxy,
-            List<ProxyMod> activeMods) {
+    public DownstreamModManager(ProxyClientSession session, ProxyPlayerSession player, ProxyPass proxy) {
         super(session, player, proxy);
         this.player = player;
-        this.activeMods = activeMods;
+        this.activeMods = ModRegistry.getInstance().getMods();
     }
 
     @Override
@@ -28,6 +29,10 @@ public class DownstreamModManager extends DownstreamPacketHandler {
         ModResult finalResult = ModResult.PASS;
 
         for (ProxyMod mod : activeMods) {
+            if (mod instanceof BaseMod baseMod && !baseMod.isEnabled()) {
+                continue;
+            }
+
             ModResult result = mod.handleDownstream(packet, player);
 
             if (result == ModResult.DENY) {

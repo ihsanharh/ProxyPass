@@ -1,6 +1,5 @@
 package com.ihsanharh.hiveutils;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
@@ -11,29 +10,19 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyServerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.UpstreamPacketHandler;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.mods.DebugMod;
-import com.ihsanharh.hiveutils.mods.PlayerTrackerMod;
-import com.ihsanharh.hiveutils.mods.ServerTrackerMod;
-import com.ihsanharh.hiveutils.mods.hideandseek.HideAndSeekESP;
+import com.ihsanharh.hiveutils.core.ModRegistry;
 
 public class UpstreamModManager extends UpstreamPacketHandler {
-    private final List<ProxyMod> activeMods = new ArrayList<>();
+    private final List<ProxyMod> activeMods;
     private final ProxyServerSession session;
 
     public UpstreamModManager(ProxyServerSession session, ProxyPass proxy, Account account) {
         super(session, proxy, account);
         this.session = session;
-
-        this.activeMods.add(new DebugMod());
-        this.activeMods.add(new ServerTrackerMod());
-        this.activeMods.add(new PlayerTrackerMod());
-        this.activeMods.add(new HideAndSeekESP());
-    }
-
-    public List<ProxyMod> getActiveMods() {
-        return activeMods;
+        this.activeMods = ModRegistry.getInstance().getMods();
     }
 
     @Override
@@ -47,6 +36,10 @@ public class UpstreamModManager extends UpstreamPacketHandler {
         ModResult finalResult = ModResult.PASS;
 
         for (ProxyMod mod : activeMods) {
+            if (mod instanceof BaseMod baseMod && !baseMod.isEnabled()) {
+                continue;
+            }
+
             ModResult result = mod.handleUpstream(packet, this.session.getPlayer());
 
             if (result == ModResult.DENY) {
