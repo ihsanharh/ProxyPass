@@ -13,6 +13,7 @@ public class PlayerStore {
     private final Map<String, PlayerData> byName = new ConcurrentHashMap<>();
     private final Map<Long, PlayerData> byEntityId = new ConcurrentHashMap<>();
     private final Map<Long, PlayerData> byRuntimeId = new ConcurrentHashMap<>();
+    private Boolean clearable = false;
 
     public static PlayerStore getInstance() {
         return INSTANCE;
@@ -86,7 +87,15 @@ public class PlayerStore {
         return byName.get(playerName.toLowerCase());
     }
 
+    public Boolean toggleClearable() {
+        this.clearable = !this.clearable;
+        return this.clearable;
+    }
+
     public void clear() {
+        if (!clearable)
+            return;
+
         byUuid.clear();
         byName.clear();
         byEntityId.clear();

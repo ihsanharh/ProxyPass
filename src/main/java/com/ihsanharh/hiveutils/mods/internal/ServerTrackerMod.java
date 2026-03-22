@@ -10,7 +10,6 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.PlayerStore;
 import com.ihsanharh.hiveutils.core.ServerStore;
 import com.ihsanharh.hiveutils.core.SilentCommandManager;
 
@@ -47,10 +46,8 @@ public class ServerTrackerMod implements ProxyMod {
                             }
 
                             ServerStore serverStore = ServerStore.getInstance();
-                            PlayerStore playerStore = PlayerStore.getInstance();
 
                             if (serverStore.setCurrentServerName(serverName)) {
-                                playerStore.clear();
                                 log.info("moved to server: {}", serverName);
                             }
                             ;
