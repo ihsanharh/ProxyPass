@@ -34,8 +34,15 @@ public class DebugMod extends BaseMod {
             }
 
             if (textMessage.contains("modlist")) {
+                String modName = textMessage.substring(textMessage.indexOf(" ") + 1);
+
                 for (ProxyMod mod : ModRegistry.getInstance().getMods()) {
                     if (mod instanceof BaseMod baseMod) {
+                        if (modName.equalsIgnoreCase(baseMod.getName())) {
+                            log.info("{} updated", baseMod.getName());
+                            baseMod.toggle();
+                        }
+
                         log.info("Mod Name: {}\nEnabled: {}", baseMod.getName(), baseMod.isEnabled());
                     }
                 }
