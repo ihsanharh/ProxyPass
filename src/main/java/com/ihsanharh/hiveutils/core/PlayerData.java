@@ -9,6 +9,7 @@ import org.cloudburstmc.math.vector.Vector3f;
 public class PlayerData {
     private String uuid;
     private String playerName;
+    private long entityId;
     private long runtimeId;
     private Vector3f position;
 

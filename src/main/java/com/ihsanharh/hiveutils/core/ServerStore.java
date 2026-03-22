@@ -18,7 +18,7 @@ public class ServerStore {
     }
 
     public Boolean setCurrentServerName(String serverName) {
-        boolean moved = !this.currentServerName.equals(serverName);
+        boolean moved = this.currentServerName != "UNKNOWN" && !this.currentServerName.contains(serverName);
 
         if (moved) {
             this.previousServerName = this.currentServerName;

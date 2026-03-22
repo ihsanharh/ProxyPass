@@ -26,7 +26,6 @@ public class PlayerTrackerMod implements ProxyMod {
                     playerStore.addPlayer(player.getUuid().toString(), player.getName(), player.getEntityId());
                 }
             } else if (action == PlayerListPacket.Action.REMOVE) {
-                log.info("Removing players: {}", playerListPacket.getEntries().size());
                 for (PlayerListPacket.Entry player : playerListPacket.getEntries()) {
                     playerStore.removePlayer(player.getUuid().toString());
                 }
@@ -34,7 +33,7 @@ public class PlayerTrackerMod implements ProxyMod {
         }
 
         if (packet instanceof AddPlayerPacket addPlayerPacket) {
-            playerStore.addPlayer(addPlayerPacket.getUuid().toString(), addPlayerPacket.getUsername(),
+            playerStore.addPlayer(addPlayerPacket.getUuid().toString(), addPlayerPacket.getUsername(), 0,
                     addPlayerPacket.getRuntimeEntityId(), addPlayerPacket.getPosition());
         }
 
