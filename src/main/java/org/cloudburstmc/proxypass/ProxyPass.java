@@ -48,7 +48,7 @@ import org.cloudburstmc.protocol.bedrock.BedrockPeer;
 import org.cloudburstmc.protocol.bedrock.BedrockPong;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
-import org.cloudburstmc.protocol.bedrock.codec.v924.Bedrock_v924;
+import org.cloudburstmc.protocol.bedrock.codec.v944.Bedrock_v944;
 import org.cloudburstmc.protocol.bedrock.data.EncodingSettings;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.netty.initializer.BedrockChannelInitializer;
@@ -94,16 +94,17 @@ public class ProxyPass {
             .addSerializer(Color.class, new ColorSerializer())
             .addDeserializer(Color.class, new ColorDeserializer())
             .addSerializer(NbtBlockDefinitionRegistry.NbtBlockDefinition.class, new NbtDefinitionSerializer());
-    public static final YAMLMapper YAML_MAPPER = (YAMLMapper) new YAMLMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    public static final YAMLMapper YAML_MAPPER = (YAMLMapper) new YAMLMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     public static final String MINECRAFT_VERSION;
 
-    public static final BedrockCodecHelper HELPER = Bedrock_v924.CODEC.createHelper();
-    public static final BedrockCodec CODEC = Bedrock_v924.CODEC
-        .toBuilder()
-        .protocolVersion(924)
-        .minecraftVersion("1.26.0")
-        .helper(() -> HELPER).build();
-        
+    public static final BedrockCodecHelper HELPER = Bedrock_v944.CODEC.createHelper();
+    public static final BedrockCodec CODEC = Bedrock_v944.CODEC
+            .toBuilder()
+            .protocolVersion(944)
+            .minecraftVersion("1.26.10")
+            .helper(() -> HELPER).build();
+
     public static final int PROTOCOL_VERSION = CODEC.getProtocolVersion();
     private static final BedrockPong ADVERTISEMENT = new BedrockPong()
             .edition("MCPE")
@@ -136,22 +137,23 @@ public class ProxyPass {
         PRETTY_PRINTER.indentArraysWith(indenter);
         PRETTY_PRINTER.indentObjectsWith(indenter);
 
-        JSON_MAPPER = new ObjectMapper().registerModule(MODULE).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).setDefaultPrettyPrinter(PRETTY_PRINTER);
+        JSON_MAPPER = new ObjectMapper().registerModule(MODULE)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).setDefaultPrettyPrinter(PRETTY_PRINTER);
         MINECRAFT_VERSION = CODEC.getMinecraftVersion();
 
         HELPER.setEncodingSettings(EncodingSettings.builder()
-            .maxListSize(Integer.MAX_VALUE)
-            .maxByteArraySize(Integer.MAX_VALUE)
-            .maxNetworkNBTSize(Integer.MAX_VALUE)
-            .maxItemNBTSize(Integer.MAX_VALUE)
-            .maxStringLength(Integer.MAX_VALUE)
-            .build());
+                .maxListSize(Integer.MAX_VALUE)
+                .maxByteArraySize(Integer.MAX_VALUE)
+                .maxNetworkNBTSize(Integer.MAX_VALUE)
+                .maxItemNBTSize(Integer.MAX_VALUE)
+                .maxStringLength(Integer.MAX_VALUE)
+                .build());
     }
 
     private final AtomicBoolean running = new AtomicBoolean(true);
 
     private final NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    
+
     private final Set<Channel> clients = ConcurrentHashMap.newKeySet();
     @Getter(AccessLevel.NONE)
     private final Set<Class<?>> ignoredPackets = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -174,9 +176,10 @@ public class ProxyPass {
 
     public static void main(String[] args) {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
-        
-        // dev.kastle.webrtc.logging.Logging.addLogSink(dev.kastle.webrtc.logging.Logging.Severity.ERROR, (severity, message) -> {
-        //     log.trace("[WebRTC Native] " + message.stripTrailing());
+
+        // dev.kastle.webrtc.logging.Logging.addLogSink(dev.kastle.webrtc.logging.Logging.Severity.ERROR,
+        // (severity, message) -> {
+        // log.trace("[WebRTC Native] " + message.stripTrailing());
         // });
 
         ProxyPass proxy = new ProxyPass();
@@ -191,7 +194,8 @@ public class ProxyPass {
         log.info("Loading configuration...");
         Path configPath = Paths.get(".").resolve("config.yml");
         if (Files.notExists(configPath) || !Files.isRegularFile(configPath)) {
-            Files.copy(ProxyPass.class.getClassLoader().getResourceAsStream("config.yml"), configPath, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(ProxyPass.class.getClassLoader().getResourceAsStream("config.yml"), configPath,
+                    StandardCopyOption.REPLACE_EXISTING);
         }
 
         configuration = Configuration.load(configPath);
@@ -227,7 +231,8 @@ public class ProxyPass {
             try {
                 client = MinecraftAuth.createHttpClient();
                 account = getAuthenticatedAccount(saveAuthDetails, client);
-                log.info("Successfully logged in as {}", account.authManager().getMinecraftMultiplayerToken().getCached().getDisplayName());
+                log.info("Successfully logged in as {}",
+                        account.authManager().getMinecraftMultiplayerToken().getCached().getDisplayName());
             } catch (Exception e) {
                 log.error("Setting to offline mode due to failure to get login chain:", e);
                 onlineMode = false;
@@ -266,9 +271,8 @@ public class ProxyPass {
                     this.xboxSessionManager.setupConnection();
 
                     signaling = new NetherNetXboxSignaling(
-                        this.xboxSessionManager.getNetherNetId(), 
-                        account.authManager().getMinecraftSession().getUpToDate().getAuthorizationHeader()
-                    );
+                            this.xboxSessionManager.getNetherNetId(),
+                            account.authManager().getMinecraftSession().getUpToDate().getAuthorizationHeader());
                     log.info("Using Xbox Signaling for incoming connections");
                 } catch (Exception e) {
                     log.error("Failed to start Xbox Session", e);
@@ -279,14 +283,13 @@ public class ProxyPass {
             if (signaling == null) {
                 signaling = new NetherNetDiscoverySignaling();
                 signaling.setAdvertisementData(
-                    new NetherNetServerSignaling.PongData.Builder()
-                        .setServerName("NetherNet Server")
-                        .setLevelName("World")
-                        .setGameType(0)
-                        .setPlayerCount(0)
-                        .setMaxPlayerCount(10)
-                        .build()
-                );
+                        new NetherNetServerSignaling.PongData.Builder()
+                                .setServerName("NetherNet Server")
+                                .setLevelName("World")
+                                .setGameType(0)
+                                .setPlayerCount(0)
+                                .setMaxPlayerCount(10)
+                                .build());
             }
 
             ChannelFuture future = new ServerBootstrap()
@@ -319,7 +322,7 @@ public class ProxyPass {
                     log.error("Failed to start Xbox Session", e);
                 }
             }
-            
+
             log.info("NetherNet server started on {}", proxyAddress);
 
         } else {
@@ -341,12 +344,12 @@ public class ProxyPass {
                     })
                     .bind(this.proxyAddress)
                     .awaitUninterruptibly();
-            
+
             if (!future.isSuccess()) {
                 throw new IOException("Failed to bind RakNet server to " + this.proxyAddress, future.cause());
             }
             this.server = future.channel();
-            
+
             this.server.pipeline().remove(RakServerRateLimiter.NAME);
             log.info("Bedrock server started on {}", proxyAddress);
         }
@@ -366,12 +369,10 @@ public class ProxyPass {
             if (socketAddress instanceof NetherNetAddress) {
                 if ("NETHERNET_JSONRPC".equalsIgnoreCase(this.serverAddress.getNetworkProtocol())) {
                     signaling = new NetherNetXboxRpcSignaling(
-                        account.authManager().getMinecraftSession().getCached().getAuthorizationHeader()
-                    );
+                            account.authManager().getMinecraftSession().getCached().getAuthorizationHeader());
                 } else {
                     signaling = new NetherNetXboxSignaling(
-                        account.authManager().getMinecraftSession().getCached().getAuthorizationHeader()
-                    );
+                            account.authManager().getMinecraftSession().getCached().getAuthorizationHeader());
                 }
             } else {
                 signaling = new NetherNetDiscoverySignaling();
@@ -388,38 +389,38 @@ public class ProxyPass {
 
         if (!isNetherNet) {
             bootstrap
-                .option(RakChannelOption.RAK_PROTOCOL_VERSION, ProxyPass.CODEC.getRaknetProtocolVersion())
-                .option(RakChannelOption.RAK_COMPATIBILITY_MODE, true)
-                .option(RakChannelOption.RAK_IP_DONT_FRAGMENT, true)
-                .option(RakChannelOption.RAK_MTU_SIZES, new Integer[]{1492, 1200, 576})
-                .option(RakChannelOption.RAK_CLIENT_INTERNAL_ADDRESSES, 20)
-                .option(RakChannelOption.RAK_TIME_BETWEEN_SEND_CONNECTION_ATTEMPTS_MS, 500)
-                .option(RakChannelOption.RAK_GUID, ThreadLocalRandom.current().nextLong())
-                .handler(new BedrockChannelInitializer<ProxyClientSession>() {
-                    @Override
-                    protected ProxyClientSession createSession0(BedrockPeer peer, int subClientId) {
-                        return new ProxyClientSession(peer, subClientId, ProxyPass.this);
-                    }
+                    .option(RakChannelOption.RAK_PROTOCOL_VERSION, ProxyPass.CODEC.getRaknetProtocolVersion())
+                    .option(RakChannelOption.RAK_COMPATIBILITY_MODE, true)
+                    .option(RakChannelOption.RAK_IP_DONT_FRAGMENT, true)
+                    .option(RakChannelOption.RAK_MTU_SIZES, new Integer[] { 1492, 1200, 576 })
+                    .option(RakChannelOption.RAK_CLIENT_INTERNAL_ADDRESSES, 20)
+                    .option(RakChannelOption.RAK_TIME_BETWEEN_SEND_CONNECTION_ATTEMPTS_MS, 500)
+                    .option(RakChannelOption.RAK_GUID, ThreadLocalRandom.current().nextLong())
+                    .handler(new BedrockChannelInitializer<ProxyClientSession>() {
+                        @Override
+                        protected ProxyClientSession createSession0(BedrockPeer peer, int subClientId) {
+                            return new ProxyClientSession(peer, subClientId, ProxyPass.this);
+                        }
 
-                    @Override
-                    protected void initSession(ProxyClientSession session) {
-                        sessionConsumer.accept(session);
-                    }
-                });
+                        @Override
+                        protected void initSession(ProxyClientSession session) {
+                            sessionConsumer.accept(session);
+                        }
+                    });
         } else {
             bootstrap
-                .option(NetherChannelOption.NETHER_CLIENT_HANDSHAKE_TIMEOUT_MS, 6000)
-                .handler(new NetherNetBedrockChannelInitializer<ProxyClientSession>() {
-                    @Override
-                    protected ProxyClientSession createSession0(BedrockPeer peer, int subClientId) {
-                        return new ProxyClientSession(peer, subClientId, ProxyPass.this);
-                    }
+                    .option(NetherChannelOption.NETHER_CLIENT_HANDSHAKE_TIMEOUT_MS, 6000)
+                    .handler(new NetherNetBedrockChannelInitializer<ProxyClientSession>() {
+                        @Override
+                        protected ProxyClientSession createSession0(BedrockPeer peer, int subClientId) {
+                            return new ProxyClientSession(peer, subClientId, ProxyPass.this);
+                        }
 
-                    @Override
-                    protected void initSession(ProxyClientSession session) {
-                        sessionConsumer.accept(session);
-                    }
-                });
+                        @Override
+                        protected void initSession(ProxyClientSession session) {
+                            sessionConsumer.accept(session);
+                        }
+                    });
         }
 
         ChannelFuture future = bootstrap.connect(socketAddress).awaitUninterruptibly();
@@ -447,7 +448,7 @@ public class ProxyPass {
 
         this.clients.forEach(Channel::disconnect);
         this.server.disconnect();
-        
+
         this.eventLoopGroup.shutdownGracefully();
     }
 
@@ -458,11 +459,12 @@ public class ProxyPass {
             }
         }
     }
-    
+
     public void saveCompressedNBT(String dataName, Object dataTag) {
         Path path = dataDir.resolve(dataName + ".nbt");
-        try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-             NBTOutputStream nbtOutputStream = NbtUtils.createGZIPWriter(outputStream)) {
+        try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+                NBTOutputStream nbtOutputStream = NbtUtils.createGZIPWriter(outputStream)) {
             nbtOutputStream.writeTag(dataTag);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -471,8 +473,9 @@ public class ProxyPass {
 
     public void saveNBT(String dataName, Object dataTag) {
         Path path = dataDir.resolve(dataName + ".dat");
-        try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-             NBTOutputStream nbtOutputStream = NbtUtils.createNetworkWriter(outputStream)) {
+        try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+                NBTOutputStream nbtOutputStream = NbtUtils.createNetworkWriter(outputStream)) {
             nbtOutputStream.writeTag(dataTag);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -482,7 +485,7 @@ public class ProxyPass {
     public Object loadNBT(String dataName) {
         Path path = dataDir.resolve(dataName + ".dat");
         try (InputStream inputStream = Files.newInputStream(path);
-            NBTInputStream nbtInputStream = NbtUtils.createNetworkReader(inputStream)) {
+                NBTInputStream nbtInputStream = NbtUtils.createNetworkReader(inputStream)) {
             return nbtInputStream.readTag();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -492,7 +495,7 @@ public class ProxyPass {
     public Object loadGzipNBT(String dataName) {
         Path path = dataDir.resolve(dataName);
         try (InputStream inputStream = Files.newInputStream(path);
-            NBTInputStream nbtInputStream = NbtUtils.createGZIPReader(inputStream)) {
+                NBTInputStream nbtInputStream = NbtUtils.createGZIPReader(inputStream)) {
             return nbtInputStream.readTag();
         } catch (IOException e) {
             return null;
@@ -501,7 +504,8 @@ public class ProxyPass {
 
     public void saveJson(String name, Object object) {
         Path outPath = dataDir.resolve(name);
-        try (OutputStream outputStream = Files.newOutputStream(outPath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
+        try (OutputStream outputStream = Files.newOutputStream(outPath, StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.CREATE)) {
             ProxyPass.JSON_MAPPER.writer(PRETTY_PRINTER).writeValue(outputStream, object);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -547,34 +551,37 @@ public class ProxyPass {
             }
             account = new Account(accountJson, client, CODEC.getMinecraftVersion());
             account.refresh();
-            Files.write(authPath, account.toJson().toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(authPath, account.toJson().toString().getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
             return account;
         }
 
-        BedrockAuthManager authManager = authManagerBuilder.login(DeviceCodeMsaAuthService::new, new Consumer<MsaDeviceCode>() {
-            @Override
-            public void accept(MsaDeviceCode msaDeviceCode) {
-                log.info("Go to " + msaDeviceCode.getVerificationUri());
-                log.info("Enter code " + msaDeviceCode.getUserCode());
+        BedrockAuthManager authManager = authManagerBuilder.login(DeviceCodeMsaAuthService::new,
+                new Consumer<MsaDeviceCode>() {
+                    @Override
+                    public void accept(MsaDeviceCode msaDeviceCode) {
+                        log.info("Go to " + msaDeviceCode.getVerificationUri());
+                        log.info("Enter code " + msaDeviceCode.getUserCode());
 
-                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                    try {
-                        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                        clipboard.setContents(new StringSelection(msaDeviceCode.getUserCode()), null);
-                        log.info("Copied code to clipboard");
-                        Desktop.getDesktop().browse(new URI(msaDeviceCode.getVerificationUri()));
-                    } catch (IOException | URISyntaxException e) {
-                        log.error("Failed to open browser", e);
+                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                            try {
+                                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                                clipboard.setContents(new StringSelection(msaDeviceCode.getUserCode()), null);
+                                log.info("Copied code to clipboard");
+                                Desktop.getDesktop().browse(new URI(msaDeviceCode.getVerificationUri()));
+                            } catch (IOException | URISyntaxException e) {
+                                log.error("Failed to open browser", e);
+                            }
+                        }
                     }
-                }
-            }
-        });
+                });
         account = new Account(authManager);
         account.refresh();
 
         if (saveAuthDetails) {
-            Files.write(authPath, account.toJson().toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(authPath, account.toJson().toString().getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         }
 
         return account;

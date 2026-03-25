@@ -1,7 +1,7 @@
 [submodule "protocol"]
 	path = protocol
-	url = https://github.com/Kas-tle/Protocol.git
-	branch = 3.0-proxypass
+	url = https://github.com/ihsanharh/Protocol
+	branch = pre/1.26.0
 [submodule "network"]
 	path = network
 	url = https://github.com/Kas-tle/NetworkCompatible.git

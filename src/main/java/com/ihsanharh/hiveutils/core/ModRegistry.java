@@ -6,6 +6,7 @@ import java.util.List;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.mods.hideandseek.HideAndSeekESP;
+import com.ihsanharh.hiveutils.mods.internal.CommandManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.PlayerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.ServerTrackerMod;
 import com.ihsanharh.hiveutils.mods.murdermystery.MurderMysteryESP;
@@ -24,6 +25,7 @@ public class ModRegistry {
         this.activeMods.add(new DebugMod());
         this.activeMods.add(new ServerTrackerMod());
         this.activeMods.add(new PlayerTrackerMod());
+        this.activeMods.add(new CommandManagerMod());
         this.activeMods.add(new MurderMysteryESP());
         this.activeMods.add(new HideAndSeekESP());
 

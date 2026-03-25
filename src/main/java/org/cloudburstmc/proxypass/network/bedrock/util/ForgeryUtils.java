@@ -77,6 +77,14 @@ public class ForgeryUtils {
     }
 
     public static AuthPayload forgeOnlineAuthData(BedrockAuthManager authManager, ECPublicKey mojangPublicKey) throws InvalidJwtException, JoseException {
+        // For protocol 944+ (OIDC), The Hive no longer uses the chain.
+        // Send the dummy chain + real Microsoft OIDC Token, just like a vanilla client.
+        if (ProxyPass.CODEC.getProtocolVersion() >= 944) {
+            String multiplayerToken = authManager.getMinecraftMultiplayerToken().getCached().getToken();
+            return new DualPayload(List.of(".."), multiplayerToken, AuthType.FULL);
+        }
+
+        // Legacy: forge 3-part Mojang chain for pre-944 servers
         MinecraftCertificateChain mcChain = authManager.getMinecraftCertificateChain().getCached();
         KeyPair sessionKeyPair = authManager.getSessionKeyPair();
         String publicBase64Key = Base64.getEncoder().encodeToString(sessionKeyPair.getPublic().getEncoded());
