@@ -183,45 +183,24 @@ public class UpstreamPacketHandler implements BedrockPacketHandler {
 
         } else {
             try {
-                // For 944+ OIDC, mojangPublicKey is not needed (dummy chain is sent instead)
-                if (ProxyPass.CODEC.getProtocolVersion() < 944 && mojangPublicKey == null) {
+                if (mojangPublicKey == null) {
                     mojangPublicKey = ForgeryUtils.forgeMojangPublicKey();
                 }
-                // Always regenerate authPayload per session to ensure skin data is fresh
-                authPayload = ForgeryUtils.forgeOnlineAuthData(account.authManager(), mojangPublicKey);
+                if (authPayload == null) {
+                    authPayload = ForgeryUtils.forgeOnlineAuthData(account.authManager(), mojangPublicKey);
+                }
             } catch (Exception e) {
                 log.error("Failed to get login chain", e);
             }
 
             jwtSkinData = ForgeryUtils.forgeOnlineSkinData(account, this.skinData, this.proxy.getTargetAddress());
 
-            // Diagnostic: compare Token cpk vs skin JWT x5u (they must match for The Hive to accept the skin)
-            try {
-                if (ProxyPass.CODEC.getProtocolVersion() >= 944 && payload instanceof DualPayload dp) {
-                    JsonWebSignature tokenJws = new JsonWebSignature();
-                    tokenJws.setCompactSerialization(dp.getToken());
-                    JSONObject tokenClaims = new JSONObject(JsonUtil.parseJson(tokenJws.getUnverifiedPayload()));
-                    String tokenCpk = String.valueOf(tokenClaims.get("cpk"));
-
-                    JsonWebSignature skinJws = new JsonWebSignature();
-                    skinJws.setCompactSerialization(jwtSkinData);
-                    String skinX5u = skinJws.getHeader("x5u");
-
-                    log.info("[SKIN DEBUG] Token cpk  : {}", tokenCpk);
-                    log.info("[SKIN DEBUG] Skin JWT x5u: {}", skinX5u);
-                    log.info("[SKIN DEBUG] Keys match  : {}", tokenCpk.equals(skinX5u));
-                }
-            } catch (Exception e) {
-                log.error("[SKIN DEBUG] Failed to compare keys", e);
-            }
-
-
             try {
                 player.getLogger().saveJson("skinData", this.skinData);
             } catch (Exception e) {
                 log.error("JSON output error: " + e.getMessage(), e);
             }
-
+            
             payload = authPayload;
         }
 
