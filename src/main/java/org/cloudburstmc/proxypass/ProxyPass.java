@@ -12,6 +12,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ihsanharh.hiveutils.UpstreamModManager;
+import com.ihsanharh.hiveutils.core.Translator;
 
 import dev.kastle.netty.channel.nethernet.NetherNetChannelFactory;
 import dev.kastle.netty.channel.nethernet.config.NetherChannelOption;
@@ -199,6 +200,8 @@ public class ProxyPass {
         }
 
         configuration = Configuration.load(configPath);
+
+        Translator.configure(configuration.getGroqApiKey());
 
         if (configuration.isEnableUi()) {
             log.info("Starting Packet Inspector UI...");
