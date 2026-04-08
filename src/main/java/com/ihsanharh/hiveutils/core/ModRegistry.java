@@ -8,6 +8,7 @@ import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.mods.chat.LiveTranslator;
 import com.ihsanharh.hiveutils.mods.hideandseek.HideAndSeekESP;
 import com.ihsanharh.hiveutils.mods.internal.CommandManagerMod;
+import com.ihsanharh.hiveutils.mods.internal.FormManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.PlayerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.ServerTrackerMod;
 import com.ihsanharh.hiveutils.mods.utils.DebugMod;
@@ -26,6 +27,7 @@ public class ModRegistry {
         this.activeMods.add(new ServerTrackerMod());
         this.activeMods.add(new PlayerTrackerMod());
         this.activeMods.add(new CommandManagerMod());
+        this.activeMods.add(new FormManagerMod());
         this.activeMods.add(new HideAndSeekESP());
         this.activeMods.add(new LiveTranslator());
 
