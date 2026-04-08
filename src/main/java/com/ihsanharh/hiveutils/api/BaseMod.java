@@ -40,5 +40,7 @@ public abstract class BaseMod implements ProxyMod {
 
     public void buildSettingsForm(ProxyPlayerSession session, CustomForm form) {}
 
-    public void handleSettingsSubmit(ProxyPlayerSession session, String response) {}
+    public boolean handleSettingsSubmit(ProxyPlayerSession session, String response) {
+        return true;
+    }
 }

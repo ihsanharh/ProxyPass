@@ -3,6 +3,8 @@ package com.ihsanharh.hiveutils.forms;
 import org.cloudburstmc.protocol.bedrock.packet.ModalFormRequestPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,6 +14,7 @@ public class FormManager {
     private static final FormManager INSTANCE = new FormManager();
     private final AtomicInteger formIdCounter = new AtomicInteger(100000);
     private final Map<Integer, Consumer<String>> formCallbacks = new ConcurrentHashMap<>();
+    private final Map<String, Deque<FormEntry>> playerFormHistory = new ConcurrentHashMap<>();
 
     private FormManager() {}
 
@@ -19,9 +22,27 @@ public class FormManager {
         return INSTANCE;
     }
 
+    private record FormEntry(Form form, Consumer<String> callback) {}
+
     public void sendForm(ProxyPlayerSession session, Form form, Consumer<String> onResponse) {
+        this.sendForm(session, form, onResponse, true);
+    }
+
+    private void sendForm(ProxyPlayerSession session, Form form, Consumer<String> onResponse, boolean addToHistory) {
+        String xuid = session.getAuthData().getXuid();
+        if (addToHistory) {
+            this.playerFormHistory.computeIfAbsent(xuid, k -> new ArrayDeque<>()).push(new FormEntry(form, onResponse));
+        }
+
         int formId = formIdCounter.getAndIncrement();
-        formCallbacks.put(formId, onResponse);
+        formCallbacks.put(formId, response -> {
+            if (response == null || response.equals("null") || response.trim().isEmpty()) {
+                // Form was closed/canceled
+                this.handleBack(session);
+            } else {
+                onResponse.accept(response);
+            }
+        });
 
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.setFormId(formId);
@@ -29,12 +50,26 @@ public class FormManager {
         session.getUpstream().sendPacketImmediately(packet);
     }
 
+    public void handleBack(ProxyPlayerSession session) {
+        String xuid = session.getAuthData().getXuid();
+        Deque<FormEntry> history = this.playerFormHistory.get(xuid);
+        
+        if (history != null && !history.isEmpty()) {
+            // Remove the current form we just closed
+            history.pop();
+            
+            // If there's a previous form, show it
+            if (!history.isEmpty()) {
+                FormEntry previous = history.peek();
+                this.sendForm(session, previous.form(), previous.callback(), false);
+            }
+        }
+    }
+
     public boolean handleResponse(int formId, String formData) {
         Consumer<String> callback = formCallbacks.remove(formId);
         if (callback != null) {
-            if (formData != null && !formData.equals("null") && !formData.trim().isEmpty()) {
-                callback.accept(formData);
-            }
+            callback.accept(formData);
             return true;
         }
         return false;

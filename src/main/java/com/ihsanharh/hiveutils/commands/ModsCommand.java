@@ -4,6 +4,8 @@ import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.ModRegistry;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihsanharh.hiveutils.forms.CustomForm;
 import com.ihsanharh.hiveutils.forms.FormManager;
 import com.ihsanharh.hiveutils.forms.SimpleForm;
@@ -55,18 +57,18 @@ public class ModsCommand extends BaseProxyCommand {
 
         FormManager.getInstance().sendForm(session, modForm, response -> {
             try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(response);
+                ObjectMapper MAPPER = new ObjectMapper();
+                JsonNode node = MAPPER.readTree(response);
 
                 if (node.isArray() && node.size() > 0) {
                     boolean enabled = node.get(0).asBoolean();
                     mod.setEnabled(enabled);
 
                     if (mod.hasSettingsForm()) {
-                        mod.handleSettingsSubmit(session, response);
+                        if (mod.handleSettingsSubmit(session, response)) {
+                            this.sendChat(session, "§aUpdated settings for " + mod.getName());
+                        }
                     }
-
-                    this.sendChat(session, "§aUpdated settings for " + mod.getName());
                 }
             } catch (Exception e) {
                 this.sendChat(session, "§cFailed to save settings for " + mod.getName());

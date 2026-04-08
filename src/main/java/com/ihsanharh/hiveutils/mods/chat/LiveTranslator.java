@@ -5,6 +5,8 @@ import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseMod;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihsanharh.hiveutils.api.ModResult;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +21,7 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class LiveTranslator extends BaseMod {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private String targetPlayer = "";
     private String targetLanguage = "en";
     private final Map<String, String> targetPlayerMap = new HashMap<>();
@@ -173,20 +176,19 @@ public class LiveTranslator extends BaseMod {
     }
 
     @Override
-    public void handleSettingsSubmit(ProxyPlayerSession session, String response) {
+    public boolean handleSettingsSubmit(ProxyPlayerSession session, String response) {
         try {
-            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response);
-            if (!node.isArray()) return;
+            JsonNode node = MAPPER.readTree(response);
+            if (!node.isArray())
+                return false;
 
-            // index 0 -> mod enabled/disabled toggle (from ModsCommand)
-            // index 1 -> Label (Label actually contributes a null to the response array!)
-            // index 2 -> Target Player Input
-            // index 3 -> Target Language Input
-            
+            String oldTargetPlayer = this.targetPlayer;
+            String oldTargetLanguage = this.targetLanguage;
+
             if (node.has(2)) {
                 this.targetPlayer = node.get(2).asText();
             }
-            
+
             if (node.has(3)) {
                 String langInput = node.get(3).asText();
                 if (langInput != null && !langInput.trim().isEmpty()) {
@@ -194,9 +196,14 @@ public class LiveTranslator extends BaseMod {
                 }
             }
 
-            this.parseTargetPlayers();
+            boolean changed = !oldTargetPlayer.equals(this.targetPlayer) || !oldTargetLanguage.equals(this.targetLanguage);
+            if (changed) {
+                this.parseTargetPlayers();
+            }
+            return changed;
         } catch (Exception e) {
             log.error("Failed to parse settings for LiveTranslator", e);
+            return false;
         }
     }
 

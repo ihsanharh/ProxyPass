@@ -61,11 +61,19 @@ public class CustomForm extends Form {
     @Setter
     public static class Toggle extends Element {
         private boolean defaultValue;
-        public Toggle() { setType("toggle"); }
-        
+
+        public Toggle() {
+            setType("toggle");
+        }
+
         @com.fasterxml.jackson.annotation.JsonProperty("default")
-        public boolean isDefaultValue() { return defaultValue; }
-        public void setDefaultValue(boolean d) { this.defaultValue = d; }
+        public boolean isDefaultValue() {
+            return defaultValue;
+        }
+
+        public void setDefaultValue(boolean d) {
+            this.defaultValue = d;
+        }
     }
 
     @Getter
@@ -73,11 +81,19 @@ public class CustomForm extends Form {
     public static class Input extends Element {
         private String placeholder = "";
         private String defaultValue = "";
-        public Input() { setType("input"); }
+
+        public Input() {
+            setType("input");
+        }
 
         @com.fasterxml.jackson.annotation.JsonProperty("default")
-        public String getDefaultValue() { return defaultValue; }
-        public void setDefaultValue(String d) { this.defaultValue = d; }
+        public String getDefaultValue() {
+            return defaultValue;
+        }
+
+        public void setDefaultValue(String d) {
+            this.defaultValue = d;
+        }
     }
 
     @Getter
@@ -85,16 +101,26 @@ public class CustomForm extends Form {
     public static class Dropdown extends Element {
         private List<String> options = new ArrayList<>();
         private int defaultValue = 0;
-        public Dropdown() { setType("dropdown"); }
+
+        public Dropdown() {
+            setType("dropdown");
+        }
 
         @com.fasterxml.jackson.annotation.JsonProperty("default")
-        public int getDefaultValue() { return defaultValue; }
-        public void setDefaultValue(int d) { this.defaultValue = d; }
+        public int getDefaultValue() {
+            return defaultValue;
+        }
+
+        public void setDefaultValue(int d) {
+            this.defaultValue = d;
+        }
     }
 
     @Getter
     @Setter
     public static class Label extends Element {
-        public Label() { setType("label"); }
+        public Label() {
+            setType("label");
+        }
     }
 }
