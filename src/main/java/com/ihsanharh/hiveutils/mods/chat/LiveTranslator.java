@@ -6,7 +6,13 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.ihsanharh.hiveutils.core.Translator;
+import com.ihsanharh.hiveutils.forms.CustomForm;
 import com.ihsanharh.hiveutils.utils.ChatParser;
 
 import lombok.extern.log4j.Log4j2;
@@ -15,6 +21,9 @@ import lombok.extern.log4j.Log4j2;
 public class LiveTranslator extends BaseMod {
     private String targetPlayer = "";
     private String targetLanguage = "en";
+    private final Map<String, String> targetPlayerMap = new HashMap<>();
+    private final Map<String, String> globalLangMap = new HashMap<>();
+
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (!(packet instanceof TextPacket textPacket)) {
@@ -25,13 +34,13 @@ public class LiveTranslator extends BaseMod {
             return ModResult.PASS;
         }
 
-        String fullMessage = textPacket.getMessage();
-        ChatParser.ParsedChat parsedChat = ChatParser.parse(fullMessage);
+        ChatParser.ParsedChat parsedChat = ChatParser.parse(textPacket.getMessage());
+        if (parsedChat == null) {
+            return ModResult.PASS;
+        }
+
         String cleanUsername = parsedChat.cleanName();
         String cleanMessage = parsedChat.cleanMessage();
-        String rawUsername = parsedChat.rawUsername();
-        String rawSplitter = parsedChat.rawSplitter();
-        String rawMessage = parsedChat.rawMessage();
 
         if (cleanMessage == null || cleanMessage.isEmpty()) {
             return ModResult.PASS;
@@ -41,46 +50,107 @@ public class LiveTranslator extends BaseMod {
             return ModResult.PASS;
         }
 
-        if (!targetPlayer.isEmpty() && !targetPlayer.toLowerCase().contains(cleanUsername.toLowerCase())) {
-            return ModResult.PASS;
+        String playerSourceLangHint = this.targetPlayerMap.get(cleanUsername.toLowerCase());
+
+        // Case 1: Player is specifically targeted
+        if (this.targetPlayerMap.containsKey(cleanUsername.toLowerCase())) {
+            this.handleTranslationLogic(session, textPacket, parsedChat, cleanMessage, playerSourceLangHint);
+            return ModResult.DENY;
         }
 
-        Translator.detectLanguage(cleanMessage).thenAccept(detectedLang -> {
-            if (detectedLang.equalsIgnoreCase(targetLanguage) || detectedLang.equalsIgnoreCase("unknown")) {
-                session.getUpstream().sendPacketImmediately(textPacket);
-                return;
-            }
-
-            Translator.translateText(cleanMessage, "auto", targetLanguage).thenAccept(result -> {
-                TextPacket outPacket = new TextPacket();
-                outPacket.setType(textPacket.getType());
-                outPacket.setNeedsTranslation(textPacket.isNeedsTranslation());
-                outPacket.setSourceName(textPacket.getSourceName());
-                outPacket.setXuid(textPacket.getXuid());
-                outPacket.setPlatformChatId(textPacket.getPlatformChatId());
-                outPacket.setFilteredMessage(textPacket.getFilteredMessage());
-                outPacket.setParameters(textPacket.getParameters());
-
-                if (result.translatedText() != null && !cleanMessage.equals(result.translatedText())) {
-                    String formatted = rawMessage + "§r (§e" + detectedLang + " §7-> §f" + result.translatedText() + "§r)";
-                    outPacket.setMessage(rawUsername + " " + rawSplitter + " " + formatted);
-                } else {
-                    outPacket.setMessage(fullMessage);
+        // Case 2: Global language filters (Japan) (Indonesian) etc.
+        if (!this.globalLangMap.isEmpty()) {
+            Translator.detectLanguage(cleanMessage).thenAccept(detectedLang -> {
+                if (detectedLang.equalsIgnoreCase(this.targetLanguage) || detectedLang.equalsIgnoreCase("unknown")) {
+                    session.getUpstream().sendPacketImmediately(textPacket);
+                    return;
                 }
 
-                session.getUpstream().sendPacketImmediately(outPacket);
+                boolean shouldTranslate = this.targetPlayer.isEmpty();
+                if (!shouldTranslate) {
+                    for (String hint : this.globalLangMap.values()) {
+                        if (detectedLang.toLowerCase().contains(hint.toLowerCase()) || hint.toLowerCase().contains(detectedLang.toLowerCase())) {
+                            shouldTranslate = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldTranslate) {
+                    this.performTranslation(session, textPacket, parsedChat, cleanMessage, detectedLang, this.targetLanguage);
+                } else {
+                    session.getUpstream().sendPacketImmediately(textPacket);
+                }
             }).exceptionally(e -> {
-                log.error("Translation request failed for message from {}", cleanUsername, e);
+                log.error("Language detection failed for message from {}", cleanUsername, e);
                 session.getUpstream().sendPacketImmediately(textPacket);
                 return null;
             });
+            return ModResult.DENY;
+        }
+
+        // Case 3: No specific players and no global filters, but Target Player is empty -> translate everything
+        if (this.targetPlayer.isEmpty()) {
+            this.handleTranslationLogic(session, textPacket, parsedChat, cleanMessage, null);
+            return ModResult.DENY;
+        }
+
+        return ModResult.PASS;
+    }
+
+    private void handleTranslationLogic(ProxyPlayerSession session, TextPacket textPacket,
+            ChatParser.ParsedChat parsedChat, String cleanMessage, String sourceHint) {
+        String cleanUsername = parsedChat.cleanName();
+
+        if (sourceHint != null) {
+            this.performTranslation(session, textPacket, parsedChat, cleanMessage, sourceHint, this.targetLanguage);
+        } else {
+            Translator.detectLanguage(cleanMessage).thenAccept(detectedLang -> {
+                if (detectedLang.equalsIgnoreCase(this.targetLanguage) || detectedLang.equalsIgnoreCase("unknown")) {
+                    session.getUpstream().sendPacketImmediately(textPacket);
+                    return;
+                }
+                this.performTranslation(session, textPacket, parsedChat, cleanMessage, detectedLang, this.targetLanguage);
+            }).exceptionally(e -> {
+                log.error("Language detection failed for message from {}", cleanUsername, e);
+                session.getUpstream().sendPacketImmediately(textPacket);
+                return null;
+            });
+        }
+    }
+
+    private void performTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, String fromLang, String toLang) {
+        String cleanUsername = parsedChat.cleanName();
+        String rawUsername = parsedChat.rawUsername();
+        String rawSplitter = parsedChat.rawSplitter();
+        String rawMessage = parsedChat.rawMessage();
+
+        Translator.translateText(cleanMessage, fromLang, toLang).thenAccept(result -> {
+            TextPacket outPacket = new TextPacket();
+            outPacket.setType(textPacket.getType());
+            outPacket.setNeedsTranslation(textPacket.isNeedsTranslation());
+            outPacket.setSourceName(textPacket.getSourceName());
+            outPacket.setXuid(textPacket.getXuid());
+            outPacket.setPlatformChatId(textPacket.getPlatformChatId());
+            outPacket.setFilteredMessage(textPacket.getFilteredMessage());
+            outPacket.setParameters(textPacket.getParameters());
+
+            if (result.translatedText() != null && 
+                !cleanMessage.equalsIgnoreCase(result.translatedText()) && 
+                !result.detectedLang().equalsIgnoreCase(this.targetLanguage)) {
+                
+                String formatted = rawMessage + "§r (§e" + result.detectedLang() + " §7-> §f" + result.translatedText() + "§r)";
+                outPacket.setMessage(rawUsername + " " + rawSplitter + " " + formatted);
+            } else {
+                outPacket.setMessage(textPacket.getMessage());
+            }
+
+            session.getUpstream().sendPacketImmediately(outPacket);
         }).exceptionally(e -> {
-            log.error("Language detection failed for message from {}", cleanUsername, e);
+            log.error("Translation request failed for message from {}", cleanUsername, e);
             session.getUpstream().sendPacketImmediately(textPacket);
             return null;
         });
-
-        return ModResult.DENY;
     }
 
     @Override
@@ -89,26 +159,73 @@ public class LiveTranslator extends BaseMod {
     }
 
     @Override
-    public void buildSettingsForm(com.ihsanharh.hiveutils.forms.CustomForm form) {
-        form.addInput("Target Player (Leave empty for all, separate with comma for multiple player)", "PlayerName", targetPlayer);
-        form.addInput("Target Language", "en, id, es...", targetLanguage);
+    public void buildSettingsForm(ProxyPlayerSession session, CustomForm form) {
+        String myName = session.getAuthData().getDisplayName();
+        form.addLabel("§b§lHow to use Filters:§r\n" +
+                      "§eFormat: §fUser §7(Hint)§f, §7(GlobalFilter)§r\n\n" +
+                      "§6Example: §7" + myName + " (id), (ja), the slayer§r\n" +
+                      "§8- §bUser (Hint): §7Translates §fUser §7as §fHint §7lang§r\n" +
+                      "§8- §b(Lang): §7Translates §fanyone §7speaking §fLang§r\n" +
+                      "§8- §bUser: §7Translates specific player (Auto)§r\n" +
+                      "§8- §bEmpty: §7Translates §fEVERYONE§r");
+        form.addInput("Target Player / Filters", "PlayerName (Hint), (Lang)...", this.targetPlayer);
+        form.addInput("Target Language", "en, id, es...", this.targetLanguage);
     }
 
     @Override
     public void handleSettingsSubmit(ProxyPlayerSession session, String response) {
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(response);
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response);
+            if (!node.isArray()) return;
+
+            // index 0 -> mod enabled/disabled toggle (from ModsCommand)
+            // index 1 -> Label (Label actually contributes a null to the response array!)
+            // index 2 -> Target Player Input
+            // index 3 -> Target Language Input
             
-            if (node.isArray() && node.size() >= 3) {
-                targetPlayer = node.get(1).asText();
-                String lang = node.get(2).asText();
-                if (!lang.isEmpty()) {
-                    targetLanguage = lang;
+            if (node.has(2)) {
+                this.targetPlayer = node.get(2).asText();
+            }
+            
+            if (node.has(3)) {
+                String langInput = node.get(3).asText();
+                if (langInput != null && !langInput.trim().isEmpty()) {
+                    this.targetLanguage = langInput.trim();
                 }
             }
+
+            this.parseTargetPlayers();
         } catch (Exception e) {
             log.error("Failed to parse settings for LiveTranslator", e);
+        }
+    }
+
+    private void parseTargetPlayers() {
+        this.targetPlayerMap.clear();
+        this.globalLangMap.clear();
+
+        if (this.targetPlayer.isEmpty()) {
+            return;
+        }
+
+        String[] parts = this.targetPlayer.split(",");
+        Pattern pattern = Pattern.compile("^(.*?)(?:\\s*\\((.*?)\\))?$");
+
+        for (String part : parts) {
+            String trimmedPart = part.trim();
+            if (trimmedPart.isEmpty()) continue;
+
+            Matcher matcher = pattern.matcher(trimmedPart);
+            if (matcher.matches()) {
+                String name = matcher.group(1).trim().toLowerCase();
+                String lang = matcher.group(2);
+                
+                if (name.isEmpty() && lang != null) {
+                    this.globalLangMap.put(lang.toLowerCase(), lang);
+                } else if (!name.isEmpty()) {
+                    this.targetPlayerMap.put(name, lang != null ? lang.trim() : null);
+                }
+            }
         }
     }
 }
