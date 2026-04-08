@@ -50,7 +50,7 @@ public class ModsCommand extends BaseProxyCommand {
         modForm.addToggle("Enabled", mod.isEnabled());
 
         if (mod.hasSettingsForm()) {
-            mod.buildSettingsForm(modForm);
+            mod.buildSettingsForm(session, modForm);
         }
 
         FormManager.getInstance().sendForm(session, modForm, response -> {
