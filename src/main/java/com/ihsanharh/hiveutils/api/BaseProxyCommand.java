@@ -38,7 +38,7 @@ public abstract class BaseProxyCommand implements ProxyCommand {
 
     protected void sendChat(ProxyPlayerSession session, String text) {
         TextPacket response = new TextPacket();
-        response.setType(TextPacket.Type.CHAT);
+        response.setType(TextPacket.Type.RAW);
         response.setMessage(text);
         response.setXuid("");
 
