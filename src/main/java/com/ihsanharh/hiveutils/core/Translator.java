@@ -60,13 +60,13 @@ public class Translator {
             systemMessage.put("role", "system");
             systemMessage.put("content", String.format(
                     "You are an expert translation engine. " +
-                    "Translate the user's message into the language represented by the code '%s'. " +
-                    "Google Translate suspects the source language code is '%s', but this may be inaccurate due to gaming slang or short text. " +
-                    "If the text is clearly a different language, ignore the suspected code. " +
-                    "CRITICAL: If the target code '%s' is invalid or unrecognizable, default to translating into English ('en'). " +
+                    "Translate the user's message into the target language: '%s'. " +
+                    "The user might have provided a source language hint: '%s'. " +
+                    "If this hint is a valid language name, country, or code, prioritize it to understand the source text. " +
+                    "If the hint is 'auto', nonsense, or contradicts the text, ignore it and detect the source language yourself. " +
                     "Respond ONLY with a valid JSON object with keys: " +
-                    "'translatedText' (the translated string) and 'detectedLang' (the standard ISO 639 or BCP-47 code of the true source language, e.g., 'en', 'id', 'zh-CN')." +
-                    "No markdown, no explanation, no extra fields.", toLang, fromLang, toLang));
+                    "'translatedText' (the translated string) and 'detectedLang' (the standard ISO 639 or BCP-47 code of the true source language, e.g., 'en', 'id', 'zh-CN'). " +
+                    "No markdown, no explanation, no extra fields.", toLang, fromLang));
 
             ObjectNode userMessage = messages.addObject();
             userMessage.put("role", "user");
