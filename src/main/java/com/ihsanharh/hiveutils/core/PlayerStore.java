@@ -20,14 +20,14 @@ public class PlayerStore {
     }
 
     public void addPlayer(String uuid, String playerName, long entityId) {
-        addPlayer(uuid, playerName, entityId, 0, Vector3f.ZERO);
+        this.addPlayer(uuid, playerName, entityId, 0, Vector3f.ZERO);
     }
 
     public void addPlayer(String uuid, String playerName, long entityId, long runtimeId, Vector3f position) {
-        PlayerData data = byUuid.computeIfAbsent(uuid,
+        PlayerData data = this.byUuid.computeIfAbsent(uuid,
                 k -> new PlayerData(uuid, playerName, entityId, runtimeId, position));
 
-        byName.put(playerName.toLowerCase(), data);
+        this.byName.put(playerName.toLowerCase(), data);
 
         if (entityId != 0) {
             data.setEntityId(entityId);
@@ -58,17 +58,17 @@ public class PlayerStore {
     }
 
     public void removePlayerByEntityId(long entityId) {
-        PlayerData removed = byEntityId.remove(entityId);
+        PlayerData removed = this.byEntityId.remove(entityId);
 
         if (removed != null)
-            removePlayer(removed.getUuid());
+            this.removePlayer(removed.getUuid());
     }
 
     public void removePlayerByRuntimeId(long runtimeId) {
-        PlayerData removed = byRuntimeId.remove(runtimeId);
+        PlayerData removed = this.byRuntimeId.remove(runtimeId);
 
         if (removed != null)
-            removePlayer(removed.getUuid());
+            this.removePlayer(removed.getUuid());
     }
 
     public PlayerData getPlayer(String uuid) {
