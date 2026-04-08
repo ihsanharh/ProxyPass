@@ -38,13 +38,13 @@ public class Translator {
     
     public static CompletableFuture<TranslationResult> translateText(String text, String fromLang, String toLang) {
         if (groqApiKey != null) {
-            return translateWithGroq(text, toLang, "llama-3.3-70b-versatile");
+            return translateWithGroq(text, fromLang, toLang, "llama-3.3-70b-versatile");
         } else {
             return translateWithGoogle(text, fromLang, toLang);
         }
     }
 
-    public static CompletableFuture<TranslationResult> translateWithGroq(String text, String toLang, String modelId) {
+    public static CompletableFuture<TranslationResult> translateWithGroq(String text, String fromLang, String toLang, String modelId) {
         try {
             String url = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -59,11 +59,14 @@ public class Translator {
             ObjectNode systemMessage = messages.addObject();
             systemMessage.put("role", "system");
             systemMessage.put("content", String.format(
-                    "You are a translation engine. Translate the user's message to the language with ISO 639-1 code '%s'. " +
-                    "Preserve the original tone and meaning exactly. " +
-                    "Respond ONLY with a valid JSON object with these two keys: " +
-                    "'translatedText' (the translated string) and 'detectedLang' (ISO 639-1 code of the source language). " +
-                    "No markdown, no explanation, no extra fields.", toLang));
+                    "You are an expert translation engine. " +
+                    "Translate the user's message into the language represented by the code '%s'. " +
+                    "Google Translate suspects the source language code is '%s', but this may be inaccurate due to gaming slang or short text. " +
+                    "If the text is clearly a different language, ignore the suspected code. " +
+                    "CRITICAL: If the target code '%s' is invalid or unrecognizable, default to translating into English ('en'). " +
+                    "Respond ONLY with a valid JSON object with keys: " +
+                    "'translatedText' (the translated string) and 'detectedLang' (the standard ISO 639 or BCP-47 code of the true source language, e.g., 'en', 'id', 'zh-CN')." +
+                    "No markdown, no explanation, no extra fields.", toLang, fromLang, toLang));
 
             ObjectNode userMessage = messages.addObject();
             userMessage.put("role", "user");
@@ -86,7 +89,7 @@ public class Translator {
                         if (response.statusCode() == 429) {
                             if (modelId.equals("llama-3.3-70b-versatile")) {
                                 log.warn("Groq model 70b returned 429 (rate limited), cascading to 8b-instant.");
-                                return translateWithGroq(text, toLang, "llama-3.1-8b-instant");
+                                return translateWithGroq(text, fromLang, toLang, "llama-3.1-8b-instant");
                             } else {
                                 log.warn("Groq models returned 429 (rate limited), falling back to Google Translate.");
                                 return translateWithGoogle(text, "auto", toLang);
