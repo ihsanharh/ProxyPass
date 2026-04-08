@@ -9,6 +9,7 @@ import org.cloudburstmc.protocol.bedrock.data.command.ChainedSubCommandData;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandData;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandData.Flag;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandOverloadData;
+import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import lombok.Getter;
@@ -34,4 +35,13 @@ public abstract class BaseProxyCommand implements ProxyCommand {
 
     @Override
     public abstract void execute(ProxyPlayerSession session, String[] args);
+
+    protected void sendChat(ProxyPlayerSession session, String text) {
+        TextPacket response = new TextPacket();
+        response.setType(TextPacket.Type.CHAT);
+        response.setMessage(text);
+        response.setXuid("");
+
+        session.getUpstream().sendPacketImmediately(response);
+    }
 }

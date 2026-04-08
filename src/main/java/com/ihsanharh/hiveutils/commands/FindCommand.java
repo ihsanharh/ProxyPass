@@ -1,6 +1,5 @@
 package com.ihsanharh.hiveutils.commands;
 
-import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
@@ -18,7 +17,7 @@ public class FindCommand extends BaseProxyCommand {
     @Override
     public void execute(ProxyPlayerSession session, String[] args) {
         if (args.length == 0) {
-            sendMessage(session, "§bUsage: /find [player]");
+            this.sendChat(session, "§bUsage: /find [player]");
             return;
         }
 
@@ -30,17 +29,9 @@ public class FindCommand extends BaseProxyCommand {
                     target.getPosition().getX(),
                     target.getPosition().getY(),
                     target.getPosition().getZ());
-            sendMessage(session, "§aFound " + target.getPlayerName() + " at " + coords);
+            this.sendChat(session, "§aFound " + target.getPlayerName() + " at " + coords);
         } else {
-            sendMessage(session, "§cThat is not a valid player!");
+            this.sendChat(session, "§cThat is not a valid player!");
         }
-    }
-
-    private void sendMessage(ProxyPlayerSession session, String text) {
-        TextPacket response = new TextPacket();
-        response.setType(TextPacket.Type.RAW);
-        response.setMessage(text);
-        response.setXuid("");
-        session.getUpstream().sendPacket(response);
     }
 }
