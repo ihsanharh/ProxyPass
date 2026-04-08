@@ -39,6 +39,12 @@ public class CustomForm extends Form {
         this.content.add(dropdown);
     }
 
+    public void addLabel(String text) {
+        Label label = new Label();
+        label.setText(text);
+        this.content.add(label);
+    }
+
     @Override
     public String getType() {
         return type;
@@ -84,5 +90,11 @@ public class CustomForm extends Form {
         @com.fasterxml.jackson.annotation.JsonProperty("default")
         public int getDefaultValue() { return defaultValue; }
         public void setDefaultValue(int d) { this.defaultValue = d; }
+    }
+
+    @Getter
+    @Setter
+    public static class Label extends Element {
+        public Label() { setType("label"); }
     }
 }
