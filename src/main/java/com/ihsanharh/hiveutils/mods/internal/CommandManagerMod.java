@@ -13,6 +13,7 @@ import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyCommand;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.commands.FindCommand;
+import com.ihsanharh.hiveutils.commands.ModsCommand;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -22,6 +23,7 @@ public class CommandManagerMod implements ProxyMod {
 
     public CommandManagerMod() {
         registerCommand(new FindCommand());
+        registerCommand(new ModsCommand());
     }
 
     private void registerCommand(ProxyCommand command) {

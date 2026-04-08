@@ -3,6 +3,8 @@ package com.ihsanharh.hiveutils.api;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.forms.CustomForm;
+
 public abstract class BaseMod implements ProxyMod {
     private boolean enabled = true;
 
@@ -31,4 +33,12 @@ public abstract class BaseMod implements ProxyMod {
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
         return ModResult.PASS;
     }
+
+    public boolean hasSettingsForm() {
+        return false;
+    }
+
+    public void buildSettingsForm(CustomForm form) {}
+
+    public void handleSettingsSubmit(ProxyPlayerSession session, String response) {}
 }
