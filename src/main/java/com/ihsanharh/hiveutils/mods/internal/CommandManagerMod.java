@@ -14,6 +14,7 @@ import com.ihsanharh.hiveutils.api.ProxyCommand;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.commands.FindCommand;
 import com.ihsanharh.hiveutils.commands.ModsCommand;
+import com.ihsanharh.hiveutils.commands.TranslateCommand;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -24,6 +25,7 @@ public class CommandManagerMod implements ProxyMod {
     public CommandManagerMod() {
         registerCommand(new FindCommand());
         registerCommand(new ModsCommand());
+        registerCommand(new TranslateCommand());
     }
 
     private void registerCommand(ProxyCommand command) {
@@ -42,11 +44,25 @@ public class CommandManagerMod implements ProxyMod {
             return ModResult.MODIFIED;
         }
 
+        for (ProxyCommand cmd : commandRegistry.values()) {
+            ModResult result = cmd.handleDownstream(packet, session);
+            if (result != ModResult.PASS) {
+                return result;
+            }
+        }
+
         return ModResult.PASS;
     }
 
     @Override
     public ModResult handleUpstream(BedrockPacket packet, ProxyPlayerSession session) {
+        for (ProxyCommand cmd : commandRegistry.values()) {
+            ModResult result = cmd.handleUpstream(packet, session);
+            if (result != ModResult.PASS) {
+                return result;
+            }
+        }
+
         if (packet instanceof CommandRequestPacket commandRequest) {
             String rawCommand = commandRequest.getCommand();
 
