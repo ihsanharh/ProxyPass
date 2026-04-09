@@ -36,7 +36,7 @@ public abstract class BaseProxyCommand implements ProxyCommand {
     @Override
     public abstract void execute(ProxyPlayerSession session, String[] args);
 
-    protected void sendChat(ProxyPlayerSession session, String text) {
+    protected void sendUserText(ProxyPlayerSession session, String text) {
         TextPacket response = new TextPacket();
         response.setType(TextPacket.Type.RAW);
         response.setMessage(text);

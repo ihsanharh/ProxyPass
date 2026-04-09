@@ -17,7 +17,7 @@ public class FindCommand extends BaseProxyCommand {
     @Override
     public void execute(ProxyPlayerSession session, String[] args) {
         if (args.length == 0) {
-            this.sendChat(session, "§bUsage: /find [player]");
+            this.sendUserText(session, "§bUsage: /find [player]");
             return;
         }
 
@@ -29,9 +29,9 @@ public class FindCommand extends BaseProxyCommand {
                     target.getPosition().getX(),
                     target.getPosition().getY(),
                     target.getPosition().getZ());
-            this.sendChat(session, "§aFound " + target.getPlayerName() + " at " + coords);
+            this.sendUserText(session, "§aFound " + target.getPlayerName() + " at " + coords);
         } else {
-            this.sendChat(session, "§cThat is not a valid player!");
+            this.sendUserText(session, "§cThat is not a valid player!");
         }
     }
 }

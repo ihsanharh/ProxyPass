@@ -66,12 +66,12 @@ public class ModsCommand extends BaseProxyCommand {
 
                     if (mod.hasSettingsForm()) {
                         if (mod.handleSettingsSubmit(session, response)) {
-                            this.sendChat(session, "§aUpdated settings for " + mod.getName());
+                            this.sendUserText(session, "§aUpdated settings for " + mod.getName());
                         }
                     }
                 }
             } catch (Exception e) {
-                this.sendChat(session, "§cFailed to save settings for " + mod.getName());
+                this.sendUserText(session, "§cFailed to save settings for " + mod.getName());
             }
         });
     }
