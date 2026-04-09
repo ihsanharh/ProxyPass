@@ -59,14 +59,17 @@ public class Translator {
             ObjectNode systemMessage = messages.addObject();
             systemMessage.put("role", "system");
             systemMessage.put("content", String.format(
-                    "You are an expert translation engine. " +
-                    "Translate the user's message into the target language: '%s'. " +
-                    "The user might have provided a source language hint: '%s'. " +
-                    "If this hint is a valid language name, country, or code, prioritize it to understand the source text. " +
-                    "If the hint is 'auto', nonsense, or contradicts the text, ignore it and detect the source language yourself. " +
-                    "Respond ONLY with a valid JSON object with keys: " +
-                    "'translatedText' (the translated string) and 'detectedLang' (the standard ISO 639 or BCP-47 code of the true source language, e.g., 'en', 'id', 'zh-CN'). " +
-                    "No markdown, no explanation, no extra fields.", toLang, fromLang));
+                    "You are a translation bot for a gaming community. " +
+                    "Your task is to translate messages into the target language: '%s'. " +
+                    "A potential source language hint is provided: '%s'. Use it if it makes sense, otherwise detect the language yourself. " +
+                    "### CONSTRAINTS: " +
+                    "1. ALWAYS provide a translation in the 'translatedText' field. " +
+                    "2. NEVER leave 'translatedText' empty or null. " +
+                    "3. If the input is already in the target language, or if you are unsure, you MUST still provide the text in '%s' (e.g. correct slang or keep it as is if it's already perfect). " +
+                    "4. If the input is nonsense, translate it into a readable equivalent in '%s' or repeat it if no other option exists, but the field MUST HAVE CONTENT. " +
+                    "### RESPONSE FORMAT: " +
+                    "Respond ONLY with a valid JSON object: {\"translatedText\": \"...\", \"detectedLang\": \"...\"}. " +
+                    "detectedLang should be a standard code like 'en', 'id', 'ja'.", toLang, fromLang, toLang, toLang));
 
             ObjectNode userMessage = messages.addObject();
             userMessage.put("role", "user");
@@ -86,6 +89,7 @@ public class Translator {
 
             return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                     .thenCompose(response -> {
+                        log.info("Groq Response ({}): {}", response.statusCode(), response.body());
                         if (response.statusCode() == 429) {
                             if (modelId.equals("llama-3.3-70b-versatile")) {
                                 log.warn("Groq model 70b returned 429 (rate limited), cascading to 8b-instant.");
@@ -103,7 +107,10 @@ public class Translator {
                                     JsonNode message = choices.get(0).path("message");
                                     if (message.hasNonNull("content")) {
                                         JsonNode contentJson = mapper.readTree(message.get("content").asText());
-                                        String translatedText = contentJson.path("translatedText").asText(text);
+                                        String translatedText = contentJson.path("translatedText").asText();
+                                        if (translatedText == null || translatedText.trim().isEmpty()) {
+                                            translatedText = text; // Fallback to original text if AI failed
+                                        }
                                         String detectedLang = contentJson.path("detectedLang").asText("unknown");
                                         return CompletableFuture.completedFuture(new TranslationResult(translatedText, detectedLang));
                                     }

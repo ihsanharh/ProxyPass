@@ -138,10 +138,12 @@ public class LiveTranslator extends BaseMod {
             outPacket.setFilteredMessage(textPacket.getFilteredMessage());
             outPacket.setParameters(textPacket.getParameters());
 
-            if (result.translatedText() != null && 
-                !cleanMessage.equalsIgnoreCase(result.translatedText()) && 
-                !result.detectedLang().equalsIgnoreCase(this.targetLanguage)) {
-                
+            boolean isAutoDetection = fromLang.equalsIgnoreCase("auto");
+            boolean langIsDifferent = !result.detectedLang().equalsIgnoreCase(this.targetLanguage);
+            boolean textIsDifferent = !cleanMessage.equalsIgnoreCase(result.translatedText());
+            boolean shouldShow = textIsDifferent && (isAutoDetection ? langIsDifferent : true);
+
+            if (result.translatedText() != null && shouldShow) {
                 String formatted = rawMessage + "§r (§e" + result.detectedLang() + " §7-> §f" + result.translatedText() + "§r)";
                 outPacket.setMessage(rawUsername + " " + rawSplitter + " " + formatted);
             } else {
