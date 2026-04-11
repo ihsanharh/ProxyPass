@@ -4,23 +4,25 @@ import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
+import com.ihsanharh.deepl.DeepLLang;
+import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.core.Translator;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 
 import lombok.extern.log4j.Log4j2;
 
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
 
 @Log4j2
 public class TranslateCommand extends BaseProxyCommand {
-    private static String autoTranslateLang = null;
+    private static DeepLLang autoTranslateLang = null;
 
     public TranslateCommand() {
         super("translate", "Translate your messages to another language");
     }
 
-    public static String getAutoTranslateLang() {
+    public static DeepLLang getAutoTranslateLang() {
         return autoTranslateLang;
     }
 
@@ -29,13 +31,19 @@ public class TranslateCommand extends BaseProxyCommand {
         if (packet instanceof TextPacket textPacket && (textPacket.getType() == TextPacket.Type.CHAT || textPacket.getType() == TextPacket.Type.RAW)) {
             if (autoTranslateLang != null) {
                 String message = textPacket.getMessage();
-                log.info("Auto-translating upstream message: {}", message);
-                Translator.translateText(message, "auto", autoTranslateLang).thenAccept(result -> {
-                    log.info("Translation result: {} ({})", result.translatedText(), result.detectedLang());
-                    if (result.translatedText() != null) {
-                        this.sendTextChat(session, result.translatedText());
-                    }
-                });
+                log.info("Auto-translating upstream message via DeepL: {}", message);
+
+                CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, autoTranslateLang))
+                    .thenAccept(translated -> {
+                        log.info("Translation result: {}", translated.translatedText());
+                        if (translated.translatedText() != null) {
+                            this.sendTextChat(session, translated.translatedText());
+                        }
+                    })
+                    .exceptionally(e -> {
+                        log.error("DeepL translation failed", e);
+                        return null;
+                    });
                 return ModResult.DENY;
             }
         }
@@ -60,29 +68,37 @@ public class TranslateCommand extends BaseProxyCommand {
 
         // Case 1: /translate <lang> (Toggle Auto-Translate)
         if (args.length == 1) {
-            if (targetLang.equalsIgnoreCase(autoTranslateLang)) {
+            if (autoTranslateLang != null && (targetLang.equalsIgnoreCase(autoTranslateLang.getCode()) || targetLang.equalsIgnoreCase(autoTranslateLang.getUiLabel()))) {
                 autoTranslateLang = null;
                 this.sendUserText(session, "§cAuto-translation disabled.");
             } else {
-                autoTranslateLang = targetLang;
+                DeepLLang target = DeepLLang.fromCodeOrLabel(targetLang);
+
+                if (target == null) {
+                    this.sendUserText(session, "§cInvalid language! Please provide a valid language code or name.");
+                    return;
+                }
+
+                autoTranslateLang = target;
                 this.sendUserText(session, "§aAuto-translation enabled! Target: §f" + targetLang);
                 this.sendUserText(session, "§7Run /translate again to disable.");
             }
             return;
         }
 
-        // Case 2: /translate <lang> <message> (One-time translate)
+        // Case 2: /translate <lang> <message> (One-time translate
         String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-        
-        Translator.translateText(message, "auto", targetLang).thenAccept(result -> {
-            if (result.translatedText() != null) {
-                this.sendTextChat(session, result.translatedText());
-            }
-        }).exceptionally(e -> {
-            log.error("Manual translation failed", e);
-            this.sendUserText(session, "§cTranslation failed.");
-            return null;
-        });
+
+        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, DeepLLang.fromCodeOrLabel(targetLang)))
+            .thenAccept(translated -> {
+                if (translated != null) {
+                    this.sendTextChat(session, translated.translatedText());
+                }
+            }).exceptionally(e -> {
+                log.error("Manual translation failed", e);
+                this.sendUserText(session, "§cTranslation failed.");
+                return null;
+            });
     }
 
     private void sendTextChat(ProxyPlayerSession session, String message) {

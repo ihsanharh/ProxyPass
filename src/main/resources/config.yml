@@ -41,7 +41,3 @@ ignored-packets:
   - "NetworkChunkPublisherUpdatePacket"
   - "ClientCacheBlobStatusPacket"
   - "ClientCacheMissResponsePacket"
-
-## API key for Groq Cloud translation. Leave empty to use the free Google Translate.
-groq-api-key: ""
-

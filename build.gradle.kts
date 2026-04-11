@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.atlantafx)
     implementation(libs.checker.qual)
     implementation(libs.netty.transport.nethernet)
+    implementation(libs.playwright)
 
     nativePlatforms.forEach { platform ->
         runtimeOnly(libs.webrtc.java) {

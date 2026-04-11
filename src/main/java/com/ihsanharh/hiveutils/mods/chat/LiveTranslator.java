@@ -8,12 +8,18 @@ import com.ihsanharh.hiveutils.api.BaseMod;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihsanharh.hiveutils.api.ModResult;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.CompletableFuture;
 
-import com.ihsanharh.hiveutils.core.Translator;
+import com.ihsanharh.deepl.DeepLLang;
+import com.ihsanharh.deepl.DeepLScraper;
+import com.ihsanharh.deepl.DeepLScraper.TranslationResult;
 import com.ihsanharh.hiveutils.forms.CustomForm;
 import com.ihsanharh.hiveutils.utils.ChatParser;
 
@@ -22,10 +28,10 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class LiveTranslator extends BaseMod {
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private String targetPlayer = "";
-    private String targetLanguage = "en";
-    private final Map<String, String> targetPlayerMap = new HashMap<>();
-    private final Map<String, String> globalLangMap = new HashMap<>();
+    private String target = "";
+    private DeepLLang targetLanguage = DeepLLang.ENGLISH_AMERICAN;
+    private final Map<String, DeepLLang> targetPlayerMap = new HashMap<>();
+    private final Map<String, DeepLLang> globalLangMap = new HashMap<>();
 
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
@@ -49,113 +55,117 @@ public class LiveTranslator extends BaseMod {
             return ModResult.PASS;
         }
 
+        // Ignore messages that are already translated
         if (cleanMessage.endsWith(")") && cleanMessage.contains(" -> ")) {
             return ModResult.PASS;
         }
 
-        String playerSourceLangHint = this.targetPlayerMap.get(cleanUsername.toLowerCase());
+        DeepLLang playerSourceLang = this.targetPlayerMap.get(cleanUsername.toLowerCase());
 
         // Case 1: Player is specifically targeted
         if (this.targetPlayerMap.containsKey(cleanUsername.toLowerCase())) {
-            this.handleTranslationLogic(session, textPacket, parsedChat, cleanMessage, playerSourceLangHint);
+            this.performTargetedTranslation(session, textPacket, parsedChat, cleanMessage, playerSourceLang, this.targetLanguage);
             return ModResult.DENY;
         }
 
-        // Case 2: Global language filters (Japan) (Indonesian) etc.
-        if (!this.globalLangMap.isEmpty()) {
-            Translator.detectLanguage(cleanMessage).thenAccept(detectedLang -> {
-                if (detectedLang.equalsIgnoreCase(this.targetLanguage) || detectedLang.equalsIgnoreCase("unknown")) {
-                    session.getUpstream().sendPacketImmediately(textPacket);
-                    return;
-                }
+        // Case 2 & 3: Global language filters OR Translate Everything (target is empty)
+        boolean hasGlobalFilters = !this.globalLangMap.isEmpty();
+        boolean translateAll = this.target.isEmpty();
 
-                boolean shouldTranslate = this.targetPlayer.isEmpty();
-                if (!shouldTranslate) {
-                    for (String hint : this.globalLangMap.values()) {
-                        if (detectedLang.toLowerCase().contains(hint.toLowerCase()) || hint.toLowerCase().contains(detectedLang.toLowerCase())) {
-                            shouldTranslate = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (shouldTranslate) {
-                    this.performTranslation(session, textPacket, parsedChat, cleanMessage, detectedLang, this.targetLanguage);
-                } else {
-                    session.getUpstream().sendPacketImmediately(textPacket);
-                }
-            }).exceptionally(e -> {
-                log.error("Language detection failed for message from {}", cleanUsername, e);
-                session.getUpstream().sendPacketImmediately(textPacket);
-                return null;
-            });
-            return ModResult.DENY;
-        }
-
-        // Case 3: No specific players and no global filters, but Target Player is empty -> translate everything
-        if (this.targetPlayer.isEmpty()) {
-            this.handleTranslationLogic(session, textPacket, parsedChat, cleanMessage, null);
+        if (hasGlobalFilters || translateAll) {
+            this.performGlobalTranslation(session, textPacket, parsedChat, cleanMessage, translateAll);
             return ModResult.DENY;
         }
 
         return ModResult.PASS;
     }
 
-    private void handleTranslationLogic(ProxyPlayerSession session, TextPacket textPacket,
-            ChatParser.ParsedChat parsedChat, String cleanMessage, String sourceHint) {
-        String cleanUsername = parsedChat.cleanName();
-
-        if (sourceHint != null) {
-            this.performTranslation(session, textPacket, parsedChat, cleanMessage, sourceHint, this.targetLanguage);
-        } else {
-            Translator.detectLanguage(cleanMessage).thenAccept(detectedLang -> {
-                if (detectedLang.equalsIgnoreCase(this.targetLanguage) || detectedLang.equalsIgnoreCase("unknown")) {
-                    session.getUpstream().sendPacketImmediately(textPacket);
-                    return;
-                }
-                this.performTranslation(session, textPacket, parsedChat, cleanMessage, detectedLang, this.targetLanguage);
-            }).exceptionally(e -> {
-                log.error("Language detection failed for message from {}", cleanUsername, e);
+    private void performTargetedTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, DeepLLang fromLang, DeepLLang toLang) {
+        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(cleanMessage, fromLang, toLang))
+        .thenAccept(translated -> {
+            if (translated == null || translated.translatedText() == null) {
                 session.getUpstream().sendPacketImmediately(textPacket);
-                return null;
-            });
-        }
+                return;
+            }
+            this.dispatchTranslatedPacket(session, textPacket, parsedChat, cleanMessage, translated);
+        })
+        .exceptionally(e -> {
+            log.error("DeepL targeted translation failed", e);
+            session.getUpstream().sendPacketImmediately(textPacket);
+            return null;
+        });
     }
 
-    private void performTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, String fromLang, String toLang) {
-        String cleanUsername = parsedChat.cleanName();
+    private void performGlobalTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, boolean translateAll) {
+        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(cleanMessage, DeepLLang.DETECT_LANGUAGE, this.targetLanguage))
+        .thenAccept(translated -> {
+            if (translated == null || translated.translatedText() == null) {
+                session.getUpstream().sendPacketImmediately(textPacket);
+                return;
+            }
+
+            // Get the Enum directly from the result!
+            DeepLLang detectedEnum = translated.detectedLanguage();
+
+            // Failsafe 1: If the detected language is already our target language, skip
+            if (detectedEnum != null && detectedEnum == this.targetLanguage) {
+                session.getUpstream().sendPacketImmediately(textPacket);
+                return;
+            }
+
+            // Failsafe 2: Evaluate the Global Filter
+            boolean passesFilter = translateAll; 
+
+            if (!passesFilter && detectedEnum != null) {
+                // Check if the detected language matches any of the (lang) hints we set
+                if (this.globalLangMap.containsKey(detectedEnum.getCode().toLowerCase())) {
+                    passesFilter = true;
+                }
+            }
+
+            if (passesFilter) {
+                this.dispatchTranslatedPacket(session, textPacket, parsedChat, cleanMessage, translated);
+            } else {
+                // It was translated, but didn't pass the filter
+                session.getUpstream().sendPacketImmediately(textPacket);
+            }
+        })
+        .exceptionally(e -> {
+            log.error("DeepL global translation failed", e);
+            session.getUpstream().sendPacketImmediately(textPacket);
+            return null;
+        });
+    }
+
+    private void dispatchTranslatedPacket(ProxyPlayerSession session, TextPacket originalPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, TranslationResult translated) {
         String rawUsername = parsedChat.rawUsername();
         String rawSplitter = parsedChat.rawSplitter();
         String rawMessage = parsedChat.rawMessage();
 
-        Translator.translateText(cleanMessage, fromLang, toLang).thenAccept(result -> {
-            TextPacket outPacket = new TextPacket();
-            outPacket.setType(textPacket.getType());
-            outPacket.setNeedsTranslation(textPacket.isNeedsTranslation());
-            outPacket.setSourceName(textPacket.getSourceName());
-            outPacket.setXuid(textPacket.getXuid());
-            outPacket.setPlatformChatId(textPacket.getPlatformChatId());
-            outPacket.setFilteredMessage(textPacket.getFilteredMessage());
-            outPacket.setParameters(textPacket.getParameters());
+        String translatedString = translated.translatedText();
+        
+        // Safely get the code directly from the Enum
+        String displayLang = (translated.detectedLanguage() != null) 
+                ? translated.detectedLanguage().getCode() 
+                : "??";
 
-            boolean isAutoDetection = fromLang.equalsIgnoreCase("auto");
-            boolean langIsDifferent = !result.detectedLang().equalsIgnoreCase(this.targetLanguage);
-            boolean textIsDifferent = !cleanMessage.equalsIgnoreCase(result.translatedText());
-            boolean shouldShow = textIsDifferent && (isAutoDetection ? langIsDifferent : true);
+        TextPacket outPacket = new TextPacket();
+        outPacket.setType(originalPacket.getType());
+        outPacket.setNeedsTranslation(originalPacket.isNeedsTranslation());
+        outPacket.setSourceName(originalPacket.getSourceName());
+        outPacket.setXuid(originalPacket.getXuid());
+        outPacket.setPlatformChatId(originalPacket.getPlatformChatId());
+        outPacket.setFilteredMessage(originalPacket.getFilteredMessage());
+        outPacket.setParameters(originalPacket.getParameters());
 
-            if (result.translatedText() != null && shouldShow) {
-                String formatted = rawMessage + "§r (§e" + result.detectedLang() + " §7-> §f" + result.translatedText() + "§r)";
-                outPacket.setMessage(rawUsername + " " + rawSplitter + " " + formatted);
-            } else {
-                outPacket.setMessage(textPacket.getMessage());
-            }
+        if (!cleanMessage.equalsIgnoreCase(translatedString)) {
+            String formatted = rawMessage + "§r (§e" + displayLang + " §7-> §f" + translatedString + "§r)";
+            outPacket.setMessage(rawUsername + " " + rawSplitter + " " + formatted);
+        } else {
+            outPacket.setMessage(originalPacket.getMessage());
+        }
 
-            session.getUpstream().sendPacketImmediately(outPacket);
-        }).exceptionally(e -> {
-            log.error("Translation request failed for message from {}", cleanUsername, e);
-            session.getUpstream().sendPacketImmediately(textPacket);
-            return null;
-        });
+        session.getUpstream().sendPacketImmediately(outPacket);
     }
 
     @Override
@@ -173,34 +183,43 @@ public class LiveTranslator extends BaseMod {
                       "§8- §b(Lang): §7Translates §fanyone §7speaking §fLang§r\n" +
                       "§8- §bUser: §7Translates specific player (Auto)§r\n" +
                       "§8- §bEmpty: §7Translates §fEVERYONE§r");
-        form.addInput("Target Player / Filters", "PlayerName (Hint), (Lang)...", this.targetPlayer);
-        form.addInput("Target Language", "en, id, es...", this.targetLanguage);
+        form.addInput("Target Player / Filters", "PlayerName (Hint), (Lang)...", this.target);
+        form.addInput("Target Language", "en, id, es...", this.targetLanguage.getUiLabel());
     }
 
     @Override
     public boolean handleSettingsSubmit(ProxyPlayerSession session, String response) {
         try {
             JsonNode node = MAPPER.readTree(response);
-            if (!node.isArray())
-                return false;
+            if (!node.isArray()) return false;
 
-            String oldTargetPlayer = this.targetPlayer;
-            String oldTargetLanguage = this.targetLanguage;
+            String oldTargetPlayer = this.target;
+            DeepLLang oldTargetLanguage = this.targetLanguage;
 
             if (node.has(2)) {
-                this.targetPlayer = node.get(2).asText();
+                this.target = node.get(2).asText();
             }
 
             if (node.has(3)) {
-                String langInput = node.get(3).asText();
-                if (langInput != null && !langInput.trim().isEmpty()) {
-                    this.targetLanguage = langInput.trim();
+                String targetLangInput = node.get(3).asText();
+
+                if (targetLangInput != null && !targetLangInput.trim().isEmpty()) {
+                    DeepLLang lang = null;
+                    try {
+                        lang = DeepLLang.fromCodeOrLabel(targetLangInput);
+                    } catch (Exception ignored) {}
+
+                    if (lang != null) {
+                        this.targetLanguage = lang;
+                    } else {
+                        this.sendUserText(session, "§cInvalid target language! Please provide a valid language code or name. Keeping previous value.");
+                    }
                 }
             }
 
-            boolean changed = !oldTargetPlayer.equals(this.targetPlayer) || !oldTargetLanguage.equals(this.targetLanguage);
+            boolean changed = !oldTargetPlayer.equals(this.target) || !oldTargetLanguage.equals(this.targetLanguage);
             if (changed) {
-                this.parseTargetPlayers();
+                this.parseTargetPlayers(session);
             }
             return changed;
         } catch (Exception e) {
@@ -209,16 +228,18 @@ public class LiveTranslator extends BaseMod {
         }
     }
 
-    private void parseTargetPlayers() {
+    private void parseTargetPlayers(ProxyPlayerSession session) {
         this.targetPlayerMap.clear();
         this.globalLangMap.clear();
 
-        if (this.targetPlayer.isEmpty()) {
+        if (this.target == null || this.target.trim().isEmpty()) {
+            this.target = "";
             return;
         }
 
-        String[] parts = this.targetPlayer.split(",");
+        String[] parts = this.target.split(",");
         Pattern pattern = Pattern.compile("^(.*?)(?:\\s*\\((.*?)\\))?$");
+        List<String> validEntries = new ArrayList<>();
 
         for (String part : parts) {
             String trimmedPart = part.trim();
@@ -226,15 +247,55 @@ public class LiveTranslator extends BaseMod {
 
             Matcher matcher = pattern.matcher(trimmedPart);
             if (matcher.matches()) {
-                String name = matcher.group(1).trim().toLowerCase();
-                String lang = matcher.group(2);
-                
-                if (name.isEmpty() && lang != null) {
-                    this.globalLangMap.put(lang.toLowerCase(), lang);
-                } else if (!name.isEmpty()) {
-                    this.targetPlayerMap.put(name, lang != null ? lang.trim() : null);
+                String originalName = matcher.group(1).trim(); 
+                String mapName = originalName.toLowerCase();
+                String langStr = matcher.group(2);
+
+                DeepLLang lang = null;
+
+                if (langStr != null && !langStr.trim().isEmpty()) {
+                    try {
+                        lang = DeepLLang.fromCodeOrLabel(langStr.trim());
+                    } catch (Exception ignored) {}
+                }
+
+                if (originalName.isEmpty()) {
+                    // Global Language Filter
+                    if (lang != null) {
+                        this.globalLangMap.put(lang.getCode().toLowerCase(), lang);
+                        validEntries.add("(" + lang.getCode() + ")");
+                    } else {
+                        this.sendUserText(session, "§cRemoved invalid global language filter: (" + langStr + "). Please provide a valid language code or name.");
+                    }
+                } else {
+                    // PlayerName OR PlayerName (Language)
+                    if (langStr != null && !langStr.trim().isEmpty()) {
+                        if (lang != null) {
+                            this.targetPlayerMap.put(mapName, lang);
+                            validEntries.add(originalName + " (" + lang.getCode() + ")");
+                        } else {
+                            this.targetPlayerMap.put(mapName, DeepLLang.DETECT_LANGUAGE);
+                            validEntries.add(originalName);
+                            this.sendUserText(session, "§cRemoved invalid language hint '" + langStr + "' for player '" + originalName + "'. Fallback to auto-detect.");
+                        }
+                    } else {
+                        // Valid PlayerName only
+                        this.targetPlayerMap.put(mapName, DeepLLang.DETECT_LANGUAGE);
+                        validEntries.add(originalName);
+                    }
                 }
             }
         }
+
+        this.target = String.join(", ", validEntries);
+    }
+
+    private void sendUserText(ProxyPlayerSession session, String message) {
+        TextPacket packet = new TextPacket();
+        packet.setType(TextPacket.Type.RAW);
+        packet.setMessage(message);
+        packet.setXuid("");
+        
+        session.getUpstream().sendPacket(packet);
     }
 }

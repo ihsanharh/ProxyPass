@@ -49,9 +49,6 @@ public class Configuration {
     @JsonProperty("ignored-packets")
     private Set<String> ignoredPackets = Collections.emptySet();
 
-    @JsonProperty("groq-api-key")
-    private String groqApiKey;
-
     public static Configuration load(Path path) throws IOException {
         try (BufferedReader reader = Files.newBufferedReader(path)) {
             return ProxyPass.YAML_MAPPER.readValue(reader, Configuration.class);
