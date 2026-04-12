@@ -100,11 +100,11 @@ public class ProxyPass {
 
     public static final BedrockCodecHelper HELPER = Bedrock_v944.CODEC.createHelper();
     public static final BedrockCodec CODEC = Bedrock_v944.CODEC
-            .toBuilder()
-            .protocolVersion(944)
-            .minecraftVersion("1.26.10")
-            .helper(() -> HELPER).build();
-
+        .toBuilder()
+        .protocolVersion(944)
+        .minecraftVersion("1.26.10")
+        .helper(() -> HELPER).build();
+        
     public static final int PROTOCOL_VERSION = CODEC.getProtocolVersion();
     private static final BedrockPong ADVERTISEMENT = new BedrockPong()
             .edition("MCPE")
