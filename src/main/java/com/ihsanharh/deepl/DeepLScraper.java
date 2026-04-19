@@ -17,16 +17,21 @@ import java.util.stream.Collectors;
 
 @Log4j2
 public class DeepLScraper {
+    private static final int MAX_INIT_RETRIES = 3;
     private static DeepLScraper INSTANCE;
     private Playwright playwright;
     private Browser browser;
     private Page page;
     private boolean isInitialized = false;
+    private boolean isInitializing = false;
     private final Semaphore lock = new Semaphore(1);
     private volatile String intendedTargetCode = null;
     private volatile String intendedSourceCode = null;
+    private final List<PendingTranslation> pendingTranslations = new ArrayList<>();
 
     private DeepLScraper() {}
+
+    private record PendingTranslation(String text, DeepLLang sourceLang, DeepLLang targetLang, CompletableFuture<TranslationResult> completableFuture) {}
 
     public record TranslationResult(String translatedText, DeepLLang detectedLanguage) {}
 
@@ -38,60 +43,102 @@ public class DeepLScraper {
     }
 
     /**
-     * Initializes the DeepL Scraper.
+     * Initializes the DeepL Scraper with retry logic.
      * @return A CompletableFuture representing the initialization process.
      */
     public CompletableFuture<Void> initialize() {
         return CompletableFuture.runAsync(() -> {
-            if (isInitialized) return;
+            if (isInitialized || isInitializing) return;
 
-            log.debug("Initializing DeepL Scraper with Playwright...");
-            try {
-                this.playwright = Playwright.create();
-                this.browser = playwright.chromium().launch();
-                this.page = browser.newPage();
+            isInitializing = true;
+            int attempt = 0;
 
-                this.page.route("**/v1/storefront/translate", route -> {
-                    if (route.request().method().equals("POST")) {
-                        String postData = route.request().postData();
+            while (attempt < MAX_INIT_RETRIES && !isInitialized) {
+                attempt++;
+                log.debug("Initializing DeepL Scraper (attempt {}/{})...", attempt, MAX_INIT_RETRIES);
 
-                        if (postData != null && this.intendedTargetCode != null) {
-                            postData = postData.replaceAll("\"target_lang\":\"[^\"]+\"", "\"target_lang\":\"" + this.intendedTargetCode + "\"");
+                try {
+                    this.playwright = Playwright.create();
+                    this.browser = playwright.chromium().launch();
+                    this.page = browser.newPage();
 
-                            if (this.intendedSourceCode != null) {
-                                postData = postData.replaceAll("\"source_lang\":\"[^\"]+\"", "\"source_lang\":\"" + this.intendedSourceCode + "\"");
+                    this.page.route("**/v1/storefront/translate", route -> {
+                        if (route.request().method().equals("POST")) {
+                            String postData = route.request().postData();
+
+                            if (postData != null && this.intendedTargetCode != null) {
+                                postData = postData.replaceAll("\"target_lang\":\"[^\"]+\"", "\"target_lang\":\"" + this.intendedTargetCode + "\"");
+
+                                if (this.intendedSourceCode != null) {
+                                    postData = postData.replaceAll("\"source_lang\":\"[^\"]+\"", "\"source_lang\":\"" + this.intendedSourceCode + "\"");
+                                }
+
+                                route.resume(new ResumeOptions().setPostData(postData));
+                                return;
                             }
-                        
-                            route.resume(new ResumeOptions().setPostData(postData));
-                            return;
-                        }  
+                        }
+
+                        route.resume();
+                    });
+
+                    log.debug("Navigating to DeepL...");
+                    this.page.navigate("https://www.deepl.com/en?tab=translate-text");
+
+                    Thread.sleep(3000);
+
+                    this.clickSourceLanguageSelector();
+                    this.page.waitForSelector("[data-testid='translator-source-lang-list-all-languages-grid']");
+                    List<String> scrapedSourceLanguages = this.page.locator("[data-testid^='translator-lang-option-'] span.truncate").allTextContents();
+                    this.checkLanguages(scrapedSourceLanguages, "source");
+
+                    this.clickTargetLanguageSelector();
+                    this.page.waitForSelector("[data-testid='translator-target-lang-list-all-languages-grid']");
+                    List<String> scrapedTargetLanguages = this.page.locator("[data-testid^='translator-lang-option-'] span.truncate").allTextContents();
+                    this.checkLanguages(scrapedTargetLanguages, "target");
+
+                    this.isInitialized = true;
+                    log.info("DeepL Scraper initialized successfully (attempt {})", attempt);
+                    processPendingTranslations();
+                    break;
+                } catch (Exception e) {
+                    log.error("Failed to initialize DeepL Scraper (attempt {}/{}): {}", attempt, MAX_INIT_RETRIES, e.getMessage());
+                    this.shutdown();
+
+                    if (attempt < MAX_INIT_RETRIES) {
+                        try {
+                            Thread.sleep(2000);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
                     }
-
-                    route.resume();
-                });
-
-                log.debug("Navigating to DeepL...");
-                this.page.navigate("https://www.deepl.com/en?tab=translate-text");
-                
-                Thread.sleep(3000);
-
-                this.clickSourceLanguageSelector();
-                this.page.waitForSelector("[data-testid='translator-source-lang-list-all-languages-grid']");
-                List<String> scrapedSourceLanguages = this.page.locator("[data-testid^='translator-lang-option-'] span.truncate").allTextContents();
-                this.checkLanguages(scrapedSourceLanguages, "source");
-
-                this.clickTargetLanguageSelector();
-                this.page.waitForSelector("[data-testid='translator-target-lang-list-all-languages-grid']");
-                List<String> scrapedTargetLanguages = this.page.locator("[data-testid^='translator-lang-option-'] span.truncate").allTextContents();
-                this.checkLanguages(scrapedTargetLanguages, "target");
-
-                this.isInitialized = true;
-                log.debug("DeepL Scraper initialized.");
-            } catch (Exception e) {
-                log.error("Failed to initialize DeepL Scraper", e);
-                this.shutdown();
+                }
             }
+
+            if (!isInitialized) {
+                log.error("DeepL Scraper failed to initialize after {} attempts", MAX_INIT_RETRIES);
+            }
+
+            isInitializing = false;
         });
+    }
+
+    private void processPendingTranslations() {
+        synchronized (pendingTranslations) {
+            log.debug("Processing {} pending translation requests...", pendingTranslations.size());
+
+            for (PendingTranslation pending : pendingTranslations) {
+                try {
+                    TranslationResult result = doTranslate(pending.text(), pending.sourceLang(), pending.targetLang());
+                    pending.completableFuture().complete(result);
+                } catch (Exception e) {
+                    log.error("Failed to process pending translation: {}", pending.text(), e);
+                    pending.completableFuture().complete(null);
+                }
+            }
+
+            pendingTranslations.clear();
+        }
     }
 
     /**
@@ -100,7 +147,8 @@ public class DeepLScraper {
     public void shutdown() {
         log.debug("Shutting down DeepL Scraper...");
         this.isInitialized = false;
-        
+        this.isInitializing = false;
+
         try {
             if (this.page != null) this.page.close();
             if (this.browser != null) this.browser.close();
@@ -120,27 +168,43 @@ public class DeepLScraper {
 
     /**
      * Translates the given text from the source language to the target language.
+     * Queues the request if DeepL Scraper is still initializing.
      * @param text The text to translate.
      * @param sourceLang The source language.
      * @param targetLang The target language.
      * @return new {@link TranslationResult} or null if an error occurs.
      */
     public TranslationResult translate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
-        long startTime = System.currentTimeMillis();
         if (!this.isInitialized) {
-            log.warn("DeepL Scraper is not initialized. Cannot perform translation yet.");
-            return null;
+            if (this.isInitializing) {
+                log.debug("DeepL Scraper is initializing, queueing translation request: '{}'", text);
+                CompletableFuture<TranslationResult> future = new CompletableFuture<>();
+
+                synchronized (pendingTranslations) {
+                    pendingTranslations.add(new PendingTranslation(text, sourceLang, targetLang, future));
+                }
+
+                return future.join();
+            } else {
+                log.warn("DeepL Scraper is not initialized. Cannot perform translation yet.");
+                return null;
+            }
         }
 
+        return doTranslate(text, sourceLang, targetLang);
+    }
+
+    private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
+        long startTime = System.currentTimeMillis();
         final String[] capturedTranslation = {null};
         final DeepLLang[] capturedLang = {null};
 
         try {
             log.debug("Queueing translation request for: '{}'", text);
-            lock.acquire(); 
+            lock.acquire();
 
             log.debug("Processing translation: '{}' from '{}' to '{}'", text, sourceLang, targetLang);
-            
+
             DeepLLang targetLangToSet = targetLang.asTarget();
 
             this.intendedTargetCode = targetLangToSet.getCode();
@@ -154,18 +218,18 @@ public class DeepLScraper {
 
             this.page.waitForResponse(response -> {
                 boolean isApiResult = response.url().contains("/v1/storefront/translate")
-                && response.request().method().equals("POST")
-                && response.status() == 200;
+                        && response.request().method().equals("POST")
+                        && response.status() == 200;
 
                 if (isApiResult) {
                     String requestData = response.request().postData();
                     if (requestData != null && requestData.contains("\"text\":[\"" + text + "\"]")) {
                         String body = response.text();
-                    
+
                         if (body.contains("\"text\":\"") && !body.contains("\"text\":\" \"")) {
                             capturedTranslation[0] = body.split("\"text\":\"")[1].split("\"")[0];
                             capturedLang[0] = DeepLLang.fromCodeOrLabel(body.split("\"detected_source_language\":\"")[1].split("\"")[0]);
-                            return true; 
+                            return true;
                         }
                     }
                 }
