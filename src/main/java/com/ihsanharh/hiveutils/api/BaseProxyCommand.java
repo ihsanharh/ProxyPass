@@ -18,19 +18,24 @@ import lombok.Getter;
 public abstract class BaseProxyCommand implements ProxyCommand {
     private final String name;
     private final String description;
+    private final CommandOverloadData[] overloads;
 
-    public BaseProxyCommand(String name, String description) {
+    public BaseProxyCommand(String name, String description, CommandOverloadData[] overloads) {
         this.name = name;
         this.description = description;
+        this.overloads = overloads;
+    }
+
+    public BaseProxyCommand(String name, String description) {
+        this(name, description, new CommandOverloadData[0]);
     }
 
     @Override
     public CommandData buildCommandData() {
         Set<Flag> commandFlags = new HashSet<>();
         List<ChainedSubCommandData> subCommands = new ArrayList<>();
-        CommandOverloadData[] overloads = new CommandOverloadData[0];
 
-        return new CommandData(name, description, commandFlags, null, null, subCommands, overloads);
+        return new CommandData(name, description, commandFlags, null, null, subCommands, this.overloads);
     }
 
     @Override
