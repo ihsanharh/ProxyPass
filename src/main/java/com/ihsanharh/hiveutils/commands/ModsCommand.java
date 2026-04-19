@@ -62,12 +62,11 @@ public class ModsCommand extends BaseProxyCommand {
 
                 if (node.isArray() && node.size() > 0) {
                     boolean enabled = node.get(0).asBoolean();
+                    boolean wasEnabled = mod.isEnabled();
                     mod.setEnabled(enabled);
 
-                    if (mod.hasSettingsForm()) {
-                        if (mod.handleSettingsSubmit(session, response)) {
-                            this.sendUserText(session, "§aUpdated settings for " + mod.getName());
-                        }
+                    if (enabled != wasEnabled || mod.hasSettingsForm() && mod.handleSettingsSubmit(session, response)) {
+                        this.sendUserText(session, "§aUpdated settings for " + mod.getName());
                     }
                 }
             } catch (Exception e) {
