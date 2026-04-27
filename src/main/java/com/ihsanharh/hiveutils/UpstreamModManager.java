@@ -3,6 +3,7 @@ package com.ihsanharh.hiveutils;
 import java.util.List;
 
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
+import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
 import org.cloudburstmc.protocol.common.PacketSignal;
 import org.cloudburstmc.proxypass.ProxyPass;
 import org.cloudburstmc.proxypass.network.bedrock.session.Account;
@@ -18,7 +19,7 @@ import com.ihsanharh.hiveutils.core.ModRegistry;
 public class UpstreamModManager extends UpstreamPacketHandler {
     private final List<ProxyMod> activeMods;
     private final ProxyServerSession session;
-
+ 
     public UpstreamModManager(ProxyServerSession session, ProxyPass proxy, Account account) {
         super(session, proxy, account);
         this.session = session;
@@ -29,7 +30,7 @@ public class UpstreamModManager extends UpstreamPacketHandler {
     public PacketSignal handlePacket(BedrockPacket packet) {
         ProxyPlayerSession playerSession = this.session.getPlayer();
 
-        if (playerSession == null || playerSession.getDownstream() == null) {
+        if (!(packet instanceof LoginPacket) && (playerSession == null || playerSession.getDownstream() == null)) {
             return super.handlePacket(packet);
         }
 

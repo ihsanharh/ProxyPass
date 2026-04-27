@@ -100,8 +100,6 @@ public class UpstreamPacketHandler implements BedrockPacketHandler {
 
             skinData = new JSONObject(JsonUtil.parseJson(jws.getUnverifiedPayload()));
 
-            log.info(skinData.toString());
-
             if (skinData.get("ServerAddress") != null) {
                 session.setConnectedViaAddress(skinData.get("ServerAddress").toString());
             }
