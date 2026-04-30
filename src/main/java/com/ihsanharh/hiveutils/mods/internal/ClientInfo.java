@@ -1,5 +1,6 @@
 package com.ihsanharh.hiveutils.mods.internal;
 
+import org.cloudburstmc.protocol.bedrock.data.auth.DualPayload;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
@@ -17,15 +18,16 @@ public class ClientInfo implements ProxyMod {
     public ModResult handleUpstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (packet instanceof LoginPacket loginPacket) {
             try {
-                String clientJwt = loginPacket.getClientJwt();
-                JsonWebSignature jws = new JsonWebSignature();
-                jws.setCompactSerialization(clientJwt);
-                JSONObject clientData = new JSONObject(JsonUtil.parseJson(jws.getUnverifiedPayload()));
+                DualPayload authPayload = (DualPayload) loginPacket.getAuthPayload();
+                JsonWebSignature tokenJws = new JsonWebSignature();
 
-                String selfSignedId = clientData.get("SelfSignedId").toString();
-                String thirdPartyName = clientData.get("ThirdPartyName").toString();
+                tokenJws.setCompactSerialization(authPayload.getToken());
 
-                ConnectedClient.getInstance().setClient(thirdPartyName, selfSignedId);
+                JSONObject tokenClaims = new JSONObject(JsonUtil.parseJson(tokenJws.getUnverifiedPayload()));
+                String xid = String.valueOf(tokenClaims.get("xid"));
+                String username = String.valueOf(tokenClaims.get("xname"));
+
+                ConnectedClient.getInstance().setClient(xid, username);
             } catch (Exception e) {
                 e.printStackTrace();
             }

@@ -1,26 +1,32 @@
 package com.ihsanharh.hiveutils.core;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
 import lombok.Getter;
 
 @Getter
 public class ConnectedClient {
     private static final ConnectedClient INSTANCE = new ConnectedClient();
 
+    private String xuid;
+    private UUID uuid;
     private String username;
-    private String uuid;
     private boolean connected = false;
 
     public static ConnectedClient getInstance() {
         return INSTANCE;
     }
 
-    public void setClient(String username, String uuid) {
+    public void setClient(String xuid, String username) {
+        this.xuid = xuid;
+        this.uuid = UUID.nameUUIDFromBytes(xuid.getBytes(StandardCharsets.UTF_8));
         this.username = username;
-        this.uuid = uuid;
         this.connected = true;
     }
 
     public void clear() {
+        this.xuid = null;
         this.username = null;
         this.uuid = null;
         this.connected = false;
