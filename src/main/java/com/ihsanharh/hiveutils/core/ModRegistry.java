@@ -3,7 +3,6 @@ package com.ihsanharh.hiveutils.core;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.mods.chat.LiveTranslator;
@@ -24,9 +23,9 @@ public class ModRegistry {
     private final List<ProxyMod> activeMods;
 
     private ModRegistry() {
-        DeepLScraper.getInstance().initialize();
         this.activeMods = new ArrayList<>();
 
+        /* mandatory mods */
         this.activeMods.add(new DebugMod());
         this.activeMods.add(new ClientInfo());
         this.activeMods.add(new ServerTrackerMod());
@@ -34,6 +33,8 @@ public class ModRegistry {
         this.activeMods.add(new PlayerTrackerMod());
         this.activeMods.add(new CommandManagerMod());
         this.activeMods.add(new FormManagerMod());
+
+        /* PnP mods */
         this.activeMods.add(new HideAndSeekESP());
         this.activeMods.add(new LiveTranslator());
 

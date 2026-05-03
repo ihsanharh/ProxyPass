@@ -275,6 +275,11 @@ public class DeepLScraper {
             log.debug("Auto-resetting cancel state on translate call");
         }
 
+        if (!this.isInitialized && !this.isInitializing) {
+            log.debug("DeepL Scraper not initialized, auto-starting...");
+            initialize();
+        }
+
         if (!this.isInitialized) {
             if (this.isInitializing) {
                 log.debug("DeepL Scraper is initializing, queueing translation request: '{}'", text);
