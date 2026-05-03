@@ -4,7 +4,6 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.protocol.bedrock.packet.AddPlayerPacket;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
-import org.cloudburstmc.protocol.bedrock.packet.PlayerSkinPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.ModResult;
@@ -26,7 +25,7 @@ public class SelfPlayerRemapMod implements ProxyMod {
         if (!client.isConnected()) return false;
 
         String machineUser = client.getUsername();
-        String proxyUser   = session.getAuthData().getDisplayName();
+        String proxyUser = session.getAuthData().getDisplayName();
         return !machineUser.equalsIgnoreCase(proxyUser);
     }
 
@@ -37,9 +36,9 @@ public class SelfPlayerRemapMod implements ProxyMod {
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (!needsRemap(session)) return ModResult.PASS;
-
-        String machineUser = ConnectedClient.getInstance().getUsername();
+        
         Map<UUID, UUID> remapTable = getRemapTable(session);
+        String clientUsername = ConnectedClient.getInstance().getUsername();
 
         if (packet instanceof PlayerListPacket playerListPacket) {
             boolean modified = false;
@@ -47,44 +46,44 @@ public class SelfPlayerRemapMod implements ProxyMod {
 
             if (playerListPacket.getAction() == PlayerListPacket.Action.ADD) {
                 for (int i = 0; i < entries.size(); i++) {
-                    PlayerListPacket.Entry old = entries.get(i);
+                    PlayerListPacket.Entry player = entries.get(i);
+                    UUID playerUuid = player.getUuid();
 
-                    if (machineUser.equalsIgnoreCase(old.getName())) {
-                        UUID real = old.getUuid();
-                        UUID fake = toFakeUuid(remapTable, real);
+                    if (clientUsername.equalsIgnoreCase(player.getName())) {
+                        UUID fakeUuid = toFakeUuid(remapTable, playerUuid);
 
-                        PlayerListPacket.Entry rebuilt = new PlayerListPacket.Entry(fake);
-                        rebuilt.setEntityId(old.getEntityId());
-                        rebuilt.setName(old.getName());
-                        rebuilt.setXuid(old.getXuid());
-                        rebuilt.setPlatformChatId(old.getPlatformChatId());
-                        rebuilt.setBuildPlatform(old.getBuildPlatform());
-                        rebuilt.setSkin(old.getSkin());
-                        rebuilt.setTeacher(old.isTeacher());
-                        rebuilt.setHost(old.isHost());
-                        rebuilt.setTrustedSkin(old.isTrustedSkin());
-                        rebuilt.setSubClient(old.isSubClient());
-                        rebuilt.setColor(old.getColor());
+                        PlayerListPacket.Entry rebuilt = new PlayerListPacket.Entry(fakeUuid);
+                        rebuilt.setEntityId(player.getEntityId());
+                        rebuilt.setName(player.getName());
+                        rebuilt.setXuid(player.getXuid());
+                        rebuilt.setPlatformChatId(player.getPlatformChatId());
+                        rebuilt.setBuildPlatform(player.getBuildPlatform());
+                        rebuilt.setSkin(player.getSkin());
+                        rebuilt.setTeacher(player.isTeacher());
+                        rebuilt.setHost(player.isHost());
+                        rebuilt.setTrustedSkin(player.isTrustedSkin());
+                        rebuilt.setSubClient(player.isSubClient());
+                        rebuilt.setColor(player.getColor());
+
                         entries.set(i, rebuilt);
-
                         modified = true;
 
-                        log.debug("[SelfRemap] PlayerList ADD  {} : {} -> {}", machineUser, real, fake);
+                        log.debug("[SelfRemap : PlayerList.ADD] Local Client is here, remapped its uuid: {} -> {}", playerUuid, fakeUuid);
                     }
                 }
 
             } else if (playerListPacket.getAction() == PlayerListPacket.Action.REMOVE) {
                 for (int i = 0; i < entries.size(); i++) {
-                    PlayerListPacket.Entry old = entries.get(i);
-                    UUID fake = remapTable.get(old.getUuid());
+                    PlayerListPacket.Entry player = entries.get(i);
+                    UUID fakeUuid = remapTable.get(player.getUuid());
 
-                    if (fake != null) {
-                        PlayerListPacket.Entry rebuilt = new PlayerListPacket.Entry(fake);
+                    if (fakeUuid != null) {
+                        PlayerListPacket.Entry rebuilt = new PlayerListPacket.Entry(fakeUuid);
                         entries.set(i, rebuilt);
 
                         modified = true;
                         
-                        log.debug("[SelfRemap] PlayerList REMOVE remapped -> {}", fake);
+                        log.debug("[SelfRemap : PlayerList.REMOVE] Local client left, remapped its uuid: {}", fakeUuid);
                     }
                 }
             }
@@ -93,26 +92,13 @@ public class SelfPlayerRemapMod implements ProxyMod {
         }
 
         if (packet instanceof AddPlayerPacket addPlayerPacket) {
-            UUID real = addPlayerPacket.getUuid();
+            UUID playerUuid = addPlayerPacket.getUuid();
 
-            if (remapTable.containsKey(real)) {
-                UUID fake = remapTable.get(real);
-                addPlayerPacket.setUuid(fake);
-                
-                log.debug("[SelfRemap] AddPlayer UUID matched: {} -> {}", real, fake);
+            if (remapTable.containsKey(playerUuid)) {
+                UUID fakeUuid = remapTable.get(playerUuid);
+                addPlayerPacket.setUuid(fakeUuid);
 
-                return ModResult.MODIFIED;
-            }
-        }
-
-        if (packet instanceof PlayerSkinPacket playerSkinPacket) {
-            UUID real = playerSkinPacket.getUuid();
-
-            if (remapTable.containsKey(real)) {
-                UUID fake = remapTable.get(real);
-                playerSkinPacket.setUuid(fake);
-
-                log.debug("[SelfRemap] PlayerSkin UUID matched: {} -> {}", real, fake);
+                log.debug("[SelfRemap : AddPlayer] Local Client is here, remapped its uuid: {} -> {}", playerUuid, fakeUuid);
 
                 return ModResult.MODIFIED;
             }
