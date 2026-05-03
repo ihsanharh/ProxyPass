@@ -8,6 +8,7 @@ import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.ServerStore;
@@ -49,6 +50,9 @@ public class ServerTrackerMod implements ProxyMod {
 
                             if (serverStore.setCurrentServerName(serverName)) {
                                 log.info("moved to server: {}", serverName);
+                                DeepLScraper scraper = DeepLScraper.getInstance();
+                                scraper.cancel();
+                                scraper.clearQueue();
                             }
                             ;
                         })
