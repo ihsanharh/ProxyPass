@@ -48,7 +48,7 @@ import org.cloudburstmc.protocol.bedrock.BedrockPeer;
 import org.cloudburstmc.protocol.bedrock.BedrockPong;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
-import org.cloudburstmc.protocol.bedrock.codec.v944.Bedrock_v944;
+import org.cloudburstmc.protocol.bedrock.codec.v975.Bedrock_v975;
 import org.cloudburstmc.protocol.bedrock.data.EncodingSettings;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.netty.initializer.BedrockChannelInitializer;
@@ -98,11 +98,11 @@ public class ProxyPass {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     public static final String MINECRAFT_VERSION;
 
-    public static final BedrockCodecHelper HELPER = Bedrock_v944.CODEC.createHelper();
-    public static final BedrockCodec CODEC = Bedrock_v944.CODEC
+    public static final BedrockCodecHelper HELPER = Bedrock_v975.CODEC.createHelper();
+    public static final BedrockCodec CODEC = Bedrock_v975.CODEC
         .toBuilder()
-        .protocolVersion(944)
-        .minecraftVersion("1.26.10")
+        .protocolVersion(975)
+        .minecraftVersion("1.26.20")
         .helper(() -> HELPER).build();
         
     public static final int PROTOCOL_VERSION = CODEC.getProtocolVersion();
@@ -557,25 +557,26 @@ public class ProxyPass {
             return account;
         }
 
-        BedrockAuthManager authManager = authManagerBuilder.login(DeviceCodeMsaAuthService::new,
-                new Consumer<MsaDeviceCode>() {
-                    @Override
-                    public void accept(MsaDeviceCode msaDeviceCode) {
-                        log.info("Go to " + msaDeviceCode.getVerificationUri());
-                        log.info("Enter code " + msaDeviceCode.getUserCode());
+        BedrockAuthManager authManager = authManagerBuilder.login(DeviceCodeMsaAuthService::new, new Consumer<MsaDeviceCode>() {
+            @Override
+            public void accept(MsaDeviceCode msaDeviceCode) {
+                URI verificationUri = URI.create(
+                        msaDeviceCode.getVerificationUri()
+                                + (URI.create(msaDeviceCode.getVerificationUri()).getQuery() != null ? '&' : '?') + "otc=" + msaDeviceCode.getUserCode()
+                );
 
-                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                            try {
-                                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                                clipboard.setContents(new StringSelection(msaDeviceCode.getUserCode()), null);
-                                log.info("Copied code to clipboard");
-                                Desktop.getDesktop().browse(new URI(msaDeviceCode.getVerificationUri()));
-                            } catch (IOException | URISyntaxException e) {
-                                log.error("Failed to open browser", e);
-                            }
-                        }
+                log.info("Go to " + verificationUri);
+                log.info("Enter code " + msaDeviceCode.getUserCode());
+
+                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                    try {
+                        Desktop.getDesktop().browse(verificationUri);
+                    } catch (IOException e) {
+                        log.error("Failed to open browser", e);
                     }
-                });
+                }
+            }
+        });
         account = new Account(authManager);
         account.refresh();
 
