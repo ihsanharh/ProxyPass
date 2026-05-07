@@ -21,9 +21,24 @@ import lombok.extern.log4j.Log4j2;
 public class ModRegistry {
     private static final ModRegistry INSTANCE = new ModRegistry();
     private final List<ProxyMod> activeMods;
+    private ModConfigStore configStore;
+    private boolean initialized = false;
+
+    static {
+        INSTANCE.ensureInitialized();
+    }
 
     private ModRegistry() {
         this.activeMods = new ArrayList<>();
+    }
+
+    private void ensureInitialized() {
+        if (this.initialized) return;
+        this.initialized = true;
+
+        this.configStore = ModConfigStore.getInstance();
+        this.configStore.ensureInitialized();
+        this.configStore.load();
 
         /* mandatory mods */
         this.activeMods.add(new DebugMod());
@@ -34,14 +49,24 @@ public class ModRegistry {
         this.activeMods.add(new CommandManagerMod());
         this.activeMods.add(new FormManagerMod());
 
-        /* PnP mods */
-        this.activeMods.add(new HideAndSeekESP());
-        this.activeMods.add(new LiveTranslator());
+        /* extra mods - load saved enabled states */
+        BaseMod hideAndSeek = new HideAndSeekESP();
+        hideAndSeek.setEnabled(configStore.getEnabledState(hideAndSeek));
+        configStore.loadSettings(hideAndSeek);
+        this.activeMods.add(hideAndSeek);
+
+        BaseMod liveTranslator = new LiveTranslator();
+        liveTranslator.setEnabled(configStore.getEnabledState(liveTranslator));
+        configStore.loadSettings(liveTranslator);
+        this.activeMods.add(liveTranslator);
 
         log.info("Loaded {} mods", this.activeMods.size());
     }
 
     public static ModRegistry getInstance() {
+        if (!INSTANCE.initialized) {
+            INSTANCE.ensureInitialized();
+        }
         return INSTANCE;
     }
 

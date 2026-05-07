@@ -3,6 +3,7 @@ package com.ihsanharh.hiveutils.commands;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
 import com.ihsanharh.hiveutils.api.ProxyMod;
+import com.ihsanharh.hiveutils.core.ModConfigStore;
 import com.ihsanharh.hiveutils.core.ModRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,6 +67,11 @@ public class ModsCommand extends BaseProxyCommand {
                     mod.setEnabled(enabled);
 
                     if (enabled != wasEnabled || mod.hasSettingsForm() && mod.handleSettingsSubmit(session, response)) {
+                        if (enabled != wasEnabled) {
+                            ModConfigStore.getInstance().setEnabledState(mod, enabled);
+                        } else if (mod.hasSettingsForm()) {
+                            ModConfigStore.getInstance().saveModSettings(mod, mod.getSettings());
+                        }
                         this.sendUserText(session, "§aUpdated settings for " + mod.getName());
                     }
                 }

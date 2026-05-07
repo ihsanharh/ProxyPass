@@ -28,20 +28,12 @@ public class DeepLScraper {
     private volatile String intendedTargetCode = null;
     private volatile String intendedSourceCode = null;
     private final List<PendingTranslation> pendingTranslations = new ArrayList<>();
-    private volatile boolean cancelRequested = false;
-    private volatile boolean cancelCurrentTranslation = false;
 
     private DeepLScraper() {}
 
     private record PendingTranslation(String text, DeepLLang sourceLang, DeepLLang targetLang, CompletableFuture<TranslationResult> completableFuture) {}
 
-    public record TranslationResult(String translatedText, DeepLLang detectedLanguage, boolean wasCancelled) {
-        public static final TranslationResult CANCELLED = new TranslationResult(null, null, true);
-
-        public TranslationResult(String translatedText, DeepLLang detectedLanguage) {
-            this(translatedText, detectedLanguage, false);
-        }
-    }
+    public record TranslationResult(String translatedText, DeepLLang detectedLanguage) {}
 
     public static synchronized DeepLScraper getInstance() {
         if (INSTANCE == null) {
@@ -56,12 +48,6 @@ public class DeepLScraper {
      */
     public CompletableFuture<Void> initialize() {
         return CompletableFuture.runAsync(() -> {
-            if (this.cancelRequested) {
-                log.debug("Resetting cancel state before initialization");
-                this.cancelRequested = false;
-                this.cancelCurrentTranslation = false;
-            }
-
             if (isInitialized || isInitializing) return;
 
             isInitializing = true;
@@ -162,8 +148,6 @@ public class DeepLScraper {
         log.debug("Shutting down DeepL Scraper...");
         this.isInitialized = false;
         this.isInitializing = false;
-        this.cancelRequested = false;
-        this.cancelCurrentTranslation = false;
 
         try {
             if (this.page != null) this.page.close();
@@ -182,84 +166,6 @@ public class DeepLScraper {
         return this.isInitialized;
     }
 
-    public void cancel() {
-        boolean hadPending = getQueueSize() > 0;
-        boolean wasProcessing = this.isInitialized && !lock.tryAcquire();
-
-        this.cancelRequested = true;
-        this.cancelCurrentTranslation = true;
-
-        if (hadPending || wasProcessing) {
-            log.info("Cancel requested (queue: {}, in-progress: {})", getQueueSize(), wasProcessing ? "yes" : "no");
-        } else {
-            log.debug("Cancel requested but nothing to cancel");
-        }
-    }
-
-    public void cancelCurrent() {
-        if (lock.tryAcquire()) {
-            lock.release();
-            log.debug("Cancel current requested but nothing in progress");
-            return;
-        }
-
-        this.cancelCurrentTranslation = true;
-        log.debug("Cancel current translation requested");
-    }
-
-    public void resetCancel() {
-        log.debug("Resetting cancel state");
-        this.cancelRequested = false;
-        this.cancelCurrentTranslation = false;
-    }
-
-    public void clearQueue() {
-        int count = getQueueSize();
-        if (count > 0) {
-            log.info("Clearing pending translation queue ({} items)...", count);
-            synchronized (pendingTranslations) {
-                for (PendingTranslation pending : pendingTranslations) {
-                    pending.completableFuture().complete(null);
-                }
-                pendingTranslations.clear();
-            }
-        } else {
-            log.debug("Clearing queue but nothing in queue");
-        }
-    }
-
-    public List<String> getQueuedTexts() {
-        synchronized (pendingTranslations) {
-            return pendingTranslations.stream()
-                    .map(PendingTranslation::text)
-                    .collect(Collectors.toList());
-        }
-    }
-
-    public boolean removeFromQueue(String textToRemove) {
-        synchronized (pendingTranslations) {
-            for (PendingTranslation pending : pendingTranslations) {
-                if (pending.text().equals(textToRemove)) {
-                    pendingTranslations.remove(pending);
-                    pending.completableFuture().complete(null);
-                    log.debug("Removed from queue: '{}'", textToRemove);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    public int getQueueSize() {
-        synchronized (pendingTranslations) {
-            return pendingTranslations.size();
-        }
-    }
-
-    public boolean isCancellationRequested() {
-        return this.cancelRequested;
-    }
-
     /**
      * Translates the given text from the source language to the target language.
      * Queues the request if DeepL Scraper is still initializing.
@@ -269,17 +175,6 @@ public class DeepLScraper {
      * @return new {@link TranslationResult} or null if an error occurs.
      */
     public TranslationResult translate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
-        if (this.cancelRequested) {
-            this.cancelRequested = false;
-            this.cancelCurrentTranslation = false;
-            log.debug("Auto-resetting cancel state on translate call");
-        }
-
-        if (!this.isInitialized && !this.isInitializing) {
-            log.debug("DeepL Scraper not initialized, auto-starting...");
-            initialize();
-        }
-
         if (!this.isInitialized) {
             if (this.isInitializing) {
                 log.debug("DeepL Scraper is initializing, queueing translation request: '{}'", text);
@@ -292,6 +187,9 @@ public class DeepLScraper {
                 return future.join();
             } else {
                 log.warn("DeepL Scraper is not initialized. Cannot perform translation yet.");
+
+                this.initialize();
+
                 return null;
             }
         }
@@ -299,14 +197,7 @@ public class DeepLScraper {
         return doTranslate(text, sourceLang, targetLang);
     }
 
-private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
-        if (this.cancelRequested) {
-            log.debug("Translation cancelled before start: cancelRequested=true");
-            return TranslationResult.CANCELLED;
-        }
-
-        this.cancelCurrentTranslation = false;
-
+    private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
         long startTime = System.currentTimeMillis();
         final String[] capturedTranslation = {null};
         final DeepLLang[] capturedLang = {null};
@@ -315,12 +206,6 @@ private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLa
             log.debug("Queueing translation request for: '{}'", text);
             lock.acquire();
 
-            if (this.cancelCurrentTranslation || this.cancelRequested) {
-                lock.release();
-                log.debug("Translation cancelled after acquiring lock");
-                return TranslationResult.CANCELLED;
-            }
-
             log.debug("Processing translation: '{}' from '{}' to '{}'", text, sourceLang, targetLang);
 
             DeepLLang targetLangToSet = targetLang.asTarget();
@@ -328,23 +213,11 @@ private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLa
             this.intendedTargetCode = targetLangToSet.getCode();
             this.intendedSourceCode = sourceLang.getCode();
 
-            if (this.cancelCurrentTranslation || this.cancelRequested) {
-                lock.release();
-                log.debug("Translation cancelled before setting UI language");
-                return TranslationResult.CANCELLED;
-            }
-
             if (this.getCurrentTargetLanguage() != targetLangToSet) {
                 this.setUITargetLanguage(targetLangToSet.getUiLabel());
             }
 
             this.setUISourceLanguage(sourceLang.getUiLabel());
-
-            if (this.cancelCurrentTranslation || this.cancelRequested) {
-                lock.release();
-                log.debug("Translation cancelled before entering text");
-                return TranslationResult.CANCELLED;
-            }
 
             this.page.waitForResponse(response -> {
                 boolean isApiResult = response.url().contains("/v1/storefront/translate")
@@ -369,12 +242,6 @@ private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLa
                 this.setSourceText(text);
             });
 
-            if (this.cancelCurrentTranslation || this.cancelRequested) {
-                lock.release();
-                log.debug("Translation cancelled after waiting for response");
-                return TranslationResult.CANCELLED;
-            }
-
             this.clearInput();
 
             long endTime = System.currentTimeMillis();
@@ -383,7 +250,7 @@ private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLa
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Translation thread was interrupted", e);
-            return TranslationResult.CANCELLED;
+            return null;
         } catch (Exception e) {
             log.error("Error during translation process", e);
             return null;

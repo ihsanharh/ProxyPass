@@ -1,8 +1,11 @@
 package com.ihsanharh.hiveutils.api;
 
+import java.util.Map;
+
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.core.ModConfigStore;
 import com.ihsanharh.hiveutils.forms.CustomForm;
 
 public abstract class BaseMod implements ProxyMod {
@@ -13,15 +16,27 @@ public abstract class BaseMod implements ProxyMod {
     }
 
     public void setEnabled(boolean enabled) {
+        boolean changed = this.enabled != enabled;
         this.enabled = enabled;
+        if (changed) {
+            ModConfigStore.getInstance().setEnabledState(this, enabled);
+        }
     }
 
     public void toggle() {
         this.enabled = !this.enabled;
+        ModConfigStore.getInstance().setEnabledState(this, this.enabled);
     }
 
     public String getName() {
         return this.getClass().getSimpleName();
+    }
+
+    public Map<String, Object> getSettings() {
+        return null;
+    }
+
+    public void loadSettings(Map<String, Object> settings) {
     }
 
     @Override

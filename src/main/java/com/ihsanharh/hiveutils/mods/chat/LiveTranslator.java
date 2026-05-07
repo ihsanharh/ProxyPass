@@ -40,10 +40,40 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
     }
 
     @Override
+    public Map<String, Object> getSettings() {
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("target", this.target);
+        settings.put("targetLanguage", this.targetLanguage.getCode());
+        return settings;
+    }
+
+    @Override
+    public void loadSettings(Map<String, Object> settings) {
+        if (settings == null || settings.isEmpty()) return;
+
+        Object targetObj = settings.get("target");
+        if (targetObj instanceof String) {
+            this.target = (String) targetObj;
+        }
+
+        Object langObj = settings.get("targetLanguage");
+        if (langObj instanceof String) {
+            DeepLLang lang = DeepLLang.fromCodeOrLabel((String) langObj);
+            if (lang != null) {
+                this.targetLanguage = lang;
+            }
+        }
+
+        if (this.target != null && !this.target.isEmpty()) {
+            this.parseTargetPlayers(null);
+        }
+    }
+
+    @Override
     public void onServerChange(String oldServer, String newServer) {
-        DeepLScraper scraper = DeepLScraper.getInstance();
-        scraper.cancel();
-        scraper.clearQueue();
+        // DeepLScraper scraper = DeepLScraper.getInstance();
+        // scraper.cancel();
+        // scraper.clearQueue();
         log.debug("cleared translation queue on server change");
     }
 
@@ -56,6 +86,8 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
         if (textPacket.getType() != TextPacket.Type.CHAT) {
             return ModResult.PASS;
         }
+
+        log.debug("Received chat packet: {}", textPacket.getMessage());
 
         ChatParser.ParsedChat parsedChat = ChatParser.parse(textPacket.getMessage());
         if (parsedChat == null) {
