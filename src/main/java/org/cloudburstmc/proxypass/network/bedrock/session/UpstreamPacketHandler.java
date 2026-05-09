@@ -7,6 +7,8 @@ import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.data.PacketCompressionAlgorithm;
 import org.cloudburstmc.protocol.bedrock.data.auth.*;
 import org.cloudburstmc.protocol.bedrock.packet.*;
+import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult;
+import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult.IdentityData;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
 import org.cloudburstmc.protocol.common.PacketSignal;
 import org.cloudburstmc.proxypass.ProxyPass;
@@ -15,6 +17,8 @@ import org.jose4j.json.JsonUtil;
 import org.jose4j.json.internal.json_simple.JSONObject;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.lang.JoseException;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -37,6 +41,9 @@ public class UpstreamPacketHandler implements BedrockPacketHandler {
     private static AuthPayload authPayload;
 
     private static boolean verifyJwt(String jwt, PublicKey key) throws JoseException {
+        if (key == null) {
+            return true;
+        }
         JsonWebSignature jws = new JsonWebSignature();
         jws.setKey(key);
         jws.setCompactSerialization(jwt);
@@ -70,27 +77,21 @@ public class UpstreamPacketHandler implements BedrockPacketHandler {
     @Override
     public PacketSignal handle(LoginPacket packet) {
         try {
-            if (!(packet.getAuthPayload() instanceof DualPayload dualPayload)) {
-                throw new IllegalStateException(
-                        "Unexpected payload type: " + packet.getAuthPayload().getClass().getName());
-            }
+            ChainValidationResult chain = EncryptionUtils.validatePayload(packet.getAuthPayload());
+            ECPublicKey identityPublicKey;
 
-            // OIDC FLOW: extract cpk from Token JWT (1.26.10+)
-            JsonWebSignature tokenJws = new JsonWebSignature();
-            tokenJws.setCompactSerialization(dualPayload.getToken());
-            JSONObject tokenClaims = new JSONObject(JsonUtil.parseJson(tokenJws.getUnverifiedPayload()));
-
-            String cpkBase64 = String.valueOf(tokenClaims.get("cpk"));
-            ECPublicKey identityPublicKey = EncryptionUtils.parseKey(cpkBase64);
-
-            if (account == null) {
-                String xname = String.valueOf(tokenClaims.get("xname"));
-                String xid = String.valueOf(tokenClaims.get("xid"));
-                this.authData = new AuthData(xname,
-                        UUID.nameUUIDFromBytes(xid.getBytes(StandardCharsets.UTF_8)), xid);
-            } else {
-                MinecraftMultiplayerToken token = account.authManager().getMinecraftMultiplayerToken().getCached();
-                this.authData = new AuthData(token.getDisplayName(), token.getUuid(), token.getXuid());
+            switch (packet.getAuthPayload()) {
+                case DualPayload _ -> {
+                    identityPublicKey = EncryptionUtils.parseKey(chain.identityClaims().identityPublicKey);
+                }
+                case TokenPayload _ -> {
+                    identityPublicKey = EncryptionUtils.parseKey(chain.identityClaims().identityPublicKey);
+                }
+                case CertificateChainPayload _ -> {
+                    JsonNode payload = ProxyPass.JSON_MAPPER.valueToTree(chain.rawIdentityClaims());
+                    identityPublicKey = EncryptionUtils.parseKey(payload.get("identityPublicKey").textValue());
+                }
+                default -> throw new IllegalStateException("Unexpected value: " + packet.getAuthPayload());
             }
 
             String clientJwt = packet.getClientJwt();
@@ -104,12 +105,21 @@ public class UpstreamPacketHandler implements BedrockPacketHandler {
                 session.setConnectedViaAddress(skinData.get("ServerAddress").toString());
             }
 
+            if (account == null) {
+                IdentityData identityData = chain.identityClaims().extraData;
+                this.authData = new AuthData(identityData.displayName, UUID.nameUUIDFromBytes(identityData.xuid.getBytes(StandardCharsets.UTF_8)), identityData.xuid);
+            } else {
+                MinecraftMultiplayerToken token = account.authManager().getMinecraftMultiplayerToken().getCached();
+                this.authData = new AuthData(token.getDisplayName(), token.getUuid(), token.getXuid());
+            }
+            
             initializeProxySession();
 
         } catch (Exception e) {
             session.disconnect("disconnectionScreen.internalError.cantConnect");
             throw new RuntimeException("Unable to complete login", e);
         }
+        
         return PacketSignal.HANDLED;
     }
 

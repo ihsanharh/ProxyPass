@@ -1,13 +1,12 @@
 package com.ihsanharh.hiveutils.mods.internal;
 
-import org.cloudburstmc.protocol.bedrock.data.auth.DualPayload;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
+import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult;
+import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
+import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult.IdentityData;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
-import org.jose4j.json.JsonUtil;
-import org.jose4j.json.internal.json_simple.JSONObject;
-import org.jose4j.jws.JsonWebSignature;
 
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
@@ -18,16 +17,10 @@ public class ClientInfo implements ProxyMod {
     public ModResult handleUpstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (packet instanceof LoginPacket loginPacket) {
             try {
-                DualPayload authPayload = (DualPayload) loginPacket.getAuthPayload();
-                JsonWebSignature tokenJws = new JsonWebSignature();
+                ChainValidationResult chain = EncryptionUtils.validatePayload(loginPacket.getAuthPayload());
+                IdentityData identityData = chain.identityClaims().extraData;
 
-                tokenJws.setCompactSerialization(authPayload.getToken());
-
-                JSONObject tokenClaims = new JSONObject(JsonUtil.parseJson(tokenJws.getUnverifiedPayload()));
-                String xid = String.valueOf(tokenClaims.get("xid"));
-                String username = String.valueOf(tokenClaims.get("xname"));
-
-                ConnectedClient.getInstance().setClient(xid, username);
+                ConnectedClient.getInstance().setClient(identityData.xuid, identityData.displayName);
             } catch (Exception e) {
                 e.printStackTrace();
             }
