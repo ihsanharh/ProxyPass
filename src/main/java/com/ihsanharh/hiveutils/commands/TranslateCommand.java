@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 @Log4j2
 public class TranslateCommand extends BaseProxyCommand {
@@ -90,17 +89,17 @@ public class TranslateCommand extends BaseProxyCommand {
                 String message = textPacket.getMessage();
                 log.info("Auto-translating upstream message via DeepL: {}", message);
 
-                CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, autoTranslateLang))
-                    .thenAccept(translated -> {
-                        log.info("Translation result: {}", translated.translatedText());
-                        if (translated.translatedText() != null) {
-                            this.sendTextChat(session, translated.translatedText());
-                        }
-                    })
-                    .exceptionally(e -> {
-                        log.error("DeepL translation failed", e);
-                        return null;
-                    });
+                DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, autoTranslateLang)
+                .thenAccept(translated -> {
+                    log.info("Translation result: {}", translated.translatedText());
+                    if (translated.translatedText() != null) {
+                        this.sendTextChat(session, translated.translatedText());
+                    }
+                })
+                .exceptionally(e -> {
+                    log.error("DeepL translation failed", e);
+                    return null;
+                });
                 return ModResult.DENY;
             }
         }
@@ -161,16 +160,16 @@ public class TranslateCommand extends BaseProxyCommand {
             return;
         }
 
-        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, target))
-            .thenAccept(translated -> {
-                if (translated != null) {
-                    this.sendTextChat(session, translated.translatedText());
-                }
-            }).exceptionally(e -> {
-                log.error("Manual translation failed", e);
-                this.sendUserText(session, "§cTranslation failed.");
-                return null;
-            });
+        DeepLScraper.getInstance().translate(message, DeepLLang.DETECT_LANGUAGE, target)
+        .thenAccept(translated -> {
+            if (translated != null) {
+                this.sendTextChat(session, translated.translatedText());
+            }
+        }).exceptionally(e -> {
+            log.error("Manual translation failed", e);
+            this.sendUserText(session, "§cTranslation failed.");
+            return null;
+        });
     }
 
     private void sendTextChat(ProxyPlayerSession session, String message) {

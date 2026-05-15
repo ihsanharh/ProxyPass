@@ -1,5 +1,7 @@
 package com.ihsanharh.deepl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class DeepLScraper {
     private static final int MAX_INIT_RETRIES = 3;
     private static DeepLScraper INSTANCE;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private Playwright playwright;
     private Browser browser;
     private Page page;
@@ -123,24 +126,6 @@ public class DeepLScraper {
         });
     }
 
-    private void processPendingTranslations() {
-        synchronized (pendingTranslations) {
-            log.debug("Processing {} pending translation requests...", pendingTranslations.size());
-
-            for (PendingTranslation pending : pendingTranslations) {
-                try {
-                    TranslationResult result = doTranslate(pending.text(), pending.sourceLang(), pending.targetLang());
-                    pending.completableFuture().complete(result);
-                } catch (Exception e) {
-                    log.error("Failed to process pending translation: {}", pending.text(), e);
-                    pending.completableFuture().complete(null);
-                }
-            }
-
-            pendingTranslations.clear();
-        }
-    }
-
     /**
      * Shuts down the DeepL Scraper.
      */
@@ -174,33 +159,68 @@ public class DeepLScraper {
      * @param targetLang The target language.
      * @return new {@link TranslationResult} or null if an error occurs.
      */
-    public TranslationResult translate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
+    public CompletableFuture<TranslationResult> translate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
         if (!this.isInitialized) {
-            if (this.isInitializing) {
-                log.debug("DeepL Scraper is initializing, queueing translation request: '{}'", text);
-                CompletableFuture<TranslationResult> future = new CompletableFuture<>();
+            CompletableFuture<TranslationResult> future = new CompletableFuture<>();
 
-                synchronized (pendingTranslations) {
-                    pendingTranslations.add(new PendingTranslation(text, sourceLang, targetLang, future));
-                }
-
-                return future.join();
-            } else {
-                log.warn("DeepL Scraper is not initialized. Cannot perform translation yet.");
-
-                this.initialize();
-
-                return null;
+            synchronized (pendingTranslations) {
+                pendingTranslations.add(new PendingTranslation(text, sourceLang, targetLang, future));
             }
+
+            if (!this.isInitializing) {
+                log.debug("DeepL Scraper is not initialized. Starting initialization...");
+                this.initialize();
+            }
+
+            return future;
         }
 
-        return doTranslate(text, sourceLang, targetLang);
+        return CompletableFuture.supplyAsync(() -> doTranslate(text, sourceLang, targetLang));
+    }
+
+    /**
+    * Clears the pending translation queue and cancels waiting futures.
+    * @return The number of pending translations that were cleared.
+        */
+    public int clearQueue() {
+        synchronized (pendingTranslations) {
+            int clearedCount = pendingTranslations.size();
+        
+            if (clearedCount == 0) {
+                return 0;
+            }
+        
+            log.debug("Clearing {} pending translations from the queue...", clearedCount);
+            for (PendingTranslation pending : pendingTranslations) {
+                pending.completableFuture().complete(new TranslationResult(pending.text(), pending.sourceLang())); 
+            }
+        
+            pendingTranslations.clear();
+            return clearedCount;
+        }
+    }
+
+    private void processPendingTranslations() {
+        synchronized (pendingTranslations) {
+            log.debug("Processing {} pending translation requests...", pendingTranslations.size());
+
+            for (PendingTranslation pending : pendingTranslations) {
+                try {
+                    TranslationResult result = doTranslate(pending.text(), pending.sourceLang(), pending.targetLang());
+                    pending.completableFuture().complete(result);
+                } catch (Exception e) {
+                    log.error("Failed to process pending translation: {}", pending.text(), e);
+                    pending.completableFuture().complete(new TranslationResult(pending.text(), pending.sourceLang()));
+                }
+            }
+
+            pendingTranslations.clear();
+        }
     }
 
     private TranslationResult doTranslate(String text, DeepLLang sourceLang, DeepLLang targetLang) {
         long startTime = System.currentTimeMillis();
-        final String[] capturedTranslation = {null};
-        final DeepLLang[] capturedLang = {null};
+        final TranslationResult[] finalResult = {new TranslationResult(text, sourceLang)};
 
         try {
             log.debug("Queueing translation request for: '{}'", text);
@@ -225,15 +245,30 @@ public class DeepLScraper {
                         && response.status() == 200;
 
                 if (isApiResult) {
-                    String requestData = response.request().postData();
-                    if (requestData != null && requestData.contains("\"text\":[\"" + text + "\"]")) {
-                        String body = response.text();
+                    try {
+                        String requestData = response.request().postData();
+                        
+                        if (requestData != null) {
+                            JsonNode reqNode = MAPPER.readTree(requestData);
+                            JsonNode textArray = reqNode.findPath("text");
 
-                        if (body.contains("\"text\":\"") && !body.contains("\"text\":\" \"")) {
-                            capturedTranslation[0] = body.split("\"text\":\"")[1].split("\"")[0];
-                            capturedLang[0] = DeepLLang.fromCodeOrLabel(body.split("\"detected_source_language\":\"")[1].split("\"")[0]);
-                            return true;
+                            if (textArray.isArray() && textArray.size() > 0 && textArray.get(0).asText().equals(text)) {
+                                String body = response.text();
+                                JsonNode root = MAPPER.readTree(body);
+                                JsonNode textNode = root.findPath("text");
+                                JsonNode langNode = root.findPath("detected_source_language");
+
+                                if (!textNode.isMissingNode() && !textNode.asText().trim().isEmpty()) {
+                                    String translatedStr = textNode.asText();
+                                    DeepLLang detectedLang = langNode.isMissingNode() ? sourceLang : DeepLLang.fromCodeOrLabel(langNode.asText());
+                                    
+                                    finalResult[0] = new TranslationResult(translatedStr, detectedLang);
+                                    return true;
+                                }
+                            }
                         }
+                    } catch(Exception e) {
+                        log.error("Failed to parse DeepL JSON response", e);
                     }
                 }
 
@@ -246,14 +281,15 @@ public class DeepLScraper {
 
             long endTime = System.currentTimeMillis();
             log.debug("Translation completed in " + (endTime - startTime) + "ms.");
-            return new TranslationResult(capturedTranslation[0], capturedLang[0]);
+
+            return finalResult[0];
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Translation thread was interrupted", e);
-            return null;
+            return new TranslationResult(text, sourceLang);
         } catch (Exception e) {
             log.error("Error during translation process", e);
-            return null;
+            return new TranslationResult(text, sourceLang);
         } finally {
             lock.release();
             log.debug("Translation complete, lock released.");

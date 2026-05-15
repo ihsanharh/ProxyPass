@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.concurrent.CompletableFuture;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -74,7 +73,6 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
         // DeepLScraper scraper = DeepLScraper.getInstance();
         // scraper.cancel();
         // scraper.clearQueue();
-        log.debug("cleared translation queue on server change");
     }
 
     @Override
@@ -127,7 +125,7 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
     }
 
     private void performTargetedTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, DeepLLang fromLang, DeepLLang toLang) {
-        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(cleanMessage, fromLang, toLang))
+        DeepLScraper.getInstance().translate(cleanMessage, fromLang, toLang)
         .thenAccept(translated -> {
             if (translated == null || translated.translatedText() == null) {
                 session.getUpstream().sendPacketImmediately(textPacket);
@@ -143,7 +141,7 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
     }
 
     private void performGlobalTranslation(ProxyPlayerSession session, TextPacket textPacket, ChatParser.ParsedChat parsedChat, String cleanMessage, boolean translateAll) {
-        CompletableFuture.supplyAsync(() -> DeepLScraper.getInstance().translate(cleanMessage, DeepLLang.DETECT_LANGUAGE, this.targetLanguage))
+        DeepLScraper.getInstance().translate(cleanMessage, DeepLLang.DETECT_LANGUAGE, this.targetLanguage)
         .thenAccept(translated -> {
             if (translated == null || translated.translatedText() == null) {
                 session.getUpstream().sendPacketImmediately(textPacket);
