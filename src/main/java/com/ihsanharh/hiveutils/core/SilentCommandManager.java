@@ -126,8 +126,6 @@ public class SilentCommandManager {
             JsonNode rootNode = JSON_MAPPER.readTree(formPacket.getFormData());
             JsonNode titleNode = rootNode.get("title");
 
-            log.info(rootNode.toPrettyString());
-
             if (titleNode != null && titleNode.isTextual()) {
                 String formTitle = titleNode.asText();
 
