@@ -11,11 +11,9 @@ import com.microsoft.playwright.options.AriaRole;
 import lombok.extern.log4j.Log4j2;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
-import java.util.stream.Collectors;
 
 @Log4j2
 public class DeepLScraper {
@@ -341,15 +339,25 @@ public class DeepLScraper {
         
         this.page.locator("button[aria-expanded='true']").click();
 
-        List<String> enumLanguages = Arrays.stream(DeepLLang.values())
-                .map(DeepLLang::getUiLabel)
-                .collect(Collectors.toList());
+        List<String> expectedWebLabels = new ArrayList<>();
         
-        List<String> missingFromWeb = new ArrayList<>(enumLanguages);
+        for (DeepLLang lang : DeepLLang.values()) { 
+            if (listType == "source") {
+                if (lang.asSource() == lang) {
+                    expectedWebLabels.add(lang.getUiLabel());
+                }
+            } else if (listType == "target") {
+                if (lang != DeepLLang.DETECT_LANGUAGE && lang.asTarget() == lang) {
+                    expectedWebLabels.add(lang.getUiLabel());
+                }
+            }
+        }
+        
+        List<String> missingFromWeb = new ArrayList<>(expectedWebLabels);
         missingFromWeb.removeAll(scrapedWebLanguages);
         
         List<String> missingFromEnum = new ArrayList<>(scrapedWebLanguages);
-        missingFromEnum.removeAll(enumLanguages);
+        missingFromEnum.removeAll(expectedWebLabels);
         missingFromEnum.remove("Detect language");
 
         if (!missingFromWeb.isEmpty()) {

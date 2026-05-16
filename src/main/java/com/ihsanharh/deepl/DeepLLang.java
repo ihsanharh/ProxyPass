@@ -147,6 +147,28 @@ public enum DeepLLang {
     }
 
     /**
+     * For languages that have multiple variants (e.g. English, Spanish, Portuguese), return a default source variant.
+     * For other languages, return itself. DETECT_LANGUAGE will return itself as it is not a real language.
+     * @return The default source language variant for this language
+     */
+    public DeepLLang asSource() {
+        switch (this) {
+            case CHINESE_SIMPLIFIED:
+            case CHINESE_TRADITIONAL:
+                return CHINESE;
+            case ENGLISH_AMERICAN:
+            case ENGLISH_BRITISH:
+                return ENGLISH;
+            case PORTUGUESE_BRAZILIAN:
+                return PORTUGUESE;
+            case SPANISH_LATIN_AMERICAN:
+                return SPANISH;
+            default:
+                return this;
+        }
+    }
+
+    /**
      * For languages that have multiple variants (e.g. English, Spanish, Portuguese), return a default target variant.
      * For other languages, return itself. DETECT_LANGUAGE cannot be used as a target and will throw an exception.
      * @return The default target language variant for this language
@@ -157,8 +179,6 @@ public enum DeepLLang {
                 throw new IllegalArgumentException("Cannot use DETECT_LANGUAGE as a target language!");
             case ENGLISH:
                 return ENGLISH_AMERICAN;
-            case PORTUGUESE:
-                return PORTUGUESE_BRAZILIAN;
             case CHINESE:
                 return CHINESE_SIMPLIFIED;
             default:
