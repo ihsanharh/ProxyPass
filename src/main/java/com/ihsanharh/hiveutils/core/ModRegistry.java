@@ -1,12 +1,14 @@
 package com.ihsanharh.hiveutils.core;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+
+import org.reflections.Reflections;
 
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.mods.chat.LiveTranslator;
-import com.ihsanharh.hiveutils.mods.hideandseek.HideAndSeekESP;
 import com.ihsanharh.hiveutils.mods.internal.ClientInfo;
 import com.ihsanharh.hiveutils.mods.internal.CommandManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.FormManagerMod;
@@ -14,7 +16,6 @@ import com.ihsanharh.hiveutils.mods.internal.PlayerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.SelfPlayerRemapMod;
 import com.ihsanharh.hiveutils.mods.internal.ServerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.SilentCommandMod;
-import com.ihsanharh.hiveutils.mods.utils.DebugMod;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -41,28 +42,55 @@ public class ModRegistry {
         this.configStore.ensureInitialized();
         this.configStore.load();
 
-        /* mandatory mods */
-        this.activeMods.add(new DebugMod());
-        this.activeMods.add(new ClientInfo());
-        this.activeMods.add(new ServerTrackerMod());
-        this.activeMods.add(new SelfPlayerRemapMod());
-        this.activeMods.add(new PlayerTrackerMod());
-        this.activeMods.add(new CommandManagerMod());
-        this.activeMods.add(new FormManagerMod());
-        this.activeMods.add(new SilentCommandMod());
+        /* mandatory internal mods - registered in specific order */
+        registerInternalMod(new ClientInfo());
+        registerInternalMod(new ServerTrackerMod());
+        registerInternalMod(new SelfPlayerRemapMod());
+        registerInternalMod(new PlayerTrackerMod());
+        registerInternalMod(new CommandManagerMod());
+        registerInternalMod(new FormManagerMod());
+        registerInternalMod(new SilentCommandMod());
 
-        /* extra mods - load saved enabled states */
-        BaseMod hideAndSeek = new HideAndSeekESP();
-        hideAndSeek.setEnabled(configStore.getEnabledState(hideAndSeek));
-        configStore.loadSettings(hideAndSeek);
-        this.activeMods.add(hideAndSeek);
-
-        BaseMod liveTranslator = new LiveTranslator();
-        liveTranslator.setEnabled(configStore.getEnabledState(liveTranslator));
-        configStore.loadSettings(liveTranslator);
-        this.activeMods.add(liveTranslator);
+        /* auto-discover external mods */
+        autoDiscoverMods();
 
         log.info("Loaded {} mods", this.activeMods.size());
+    }
+
+    private void registerInternalMod(ProxyMod mod) {
+        this.activeMods.add(mod);
+        log.debug("Registered internal mod: {}", mod.getClass().getSimpleName());
+    }
+
+    private void autoDiscoverMods() {
+        Reflections reflections = new Reflections("com.ihsanharh.hiveutils.mods");
+        Set<Class<? extends ProxyMod>> modClasses = reflections.getSubTypesOf(ProxyMod.class);
+
+        for (Class<? extends ProxyMod> modClass : modClasses) {
+            String packageName = modClass.getPackageName();
+
+            if (packageName.contains(".mods.internal")) {
+                continue;
+            }
+
+            if (Modifier.isAbstract(modClass.getModifiers())) {
+                continue;
+            }
+
+            try {
+                ProxyMod mod = modClass.getDeclaredConstructor().newInstance();
+
+                if (mod instanceof BaseMod baseMod) {
+                    baseMod.setEnabled(configStore.getEnabledState(baseMod));
+                    configStore.loadSettings(baseMod);
+                }
+
+                this.activeMods.add(mod);
+                log.debug("Auto-discovered external mod: {}", modClass.getSimpleName());
+            } catch (Exception e) {
+                log.error("Failed to load mod: {}", modClass.getSimpleName(), e);
+            }
+        }
     }
 
     public static ModRegistry getInstance() {

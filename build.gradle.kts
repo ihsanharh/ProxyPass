@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.checker.qual)
     implementation(libs.netty.transport.nethernet)
     implementation(libs.playwright)
+    implementation(libs.reflections)
 
     nativePlatforms.forEach { platform ->
         runtimeOnly(libs.webrtc.java) {
