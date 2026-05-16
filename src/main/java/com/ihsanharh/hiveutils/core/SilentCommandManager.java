@@ -3,9 +3,13 @@ package com.ihsanharh.hiveutils.core;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginData;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginType;
 import org.cloudburstmc.protocol.bedrock.packet.CommandRequestPacket;
+import org.cloudburstmc.protocol.bedrock.packet.ModalFormRequestPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import lombok.extern.log4j.Log4j2;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,83 +19,137 @@ import java.util.Map;
 @Log4j2
 public class SilentCommandManager {
     private static final SilentCommandManager INSTANCE = new SilentCommandManager();
-    
-    // 1. THE TASK OBJECT: Groups everything a player is waiting for into one safe bundle.
-    private static class CommandTask {
-        final ArrayList<String> expectedTriggers;
-        final ArrayList<String> capturedLines = new ArrayList<>();
-        final CompletableFuture<ArrayList<String>> future = new CompletableFuture<>();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    private static final String FORM_PREFIX = "form:";
 
-        CommandTask(ArrayList<String> expectedTriggers) {
-            this.expectedTriggers = expectedTriggers;
+    public static class SilentCommandResult {
+        public final ArrayList<String> textLines;
+        public final ModalFormRequestPacket form;
+
+        public SilentCommandResult(ArrayList<String> textLines, ModalFormRequestPacket form) {
+            this.textLines = textLines;
+            this.form = form;
         }
     }
 
-    // 2. ONE MAP TO RULE THEM ALL: Maps the Player UUID to their specific Task.
+    private static class CommandTask {
+        final String expectedFormTitle;
+        final ArrayList<String> expectedTriggers;
+        final ArrayList<String> capturedLines = new ArrayList<>();
+        ModalFormRequestPacket capturedForm;
+        boolean formCaptured;
+        final CompletableFuture<SilentCommandResult> future;
+
+        CommandTask(String expectedFormTitle, ArrayList<String> expectedTriggers, CompletableFuture<SilentCommandResult> future) {
+            this.expectedFormTitle = expectedFormTitle;
+            this.expectedTriggers = expectedTriggers;
+            this.future = future;
+        }
+
+        boolean isDone() {
+            boolean textDone = expectedTriggers.isEmpty() || capturedLines.size() >= expectedTriggers.size();
+            boolean formDone = expectedFormTitle == null || formCaptured;
+            return textDone && formDone;
+        }
+    }
+
     private final Map<String, CommandTask> activeTasks = new ConcurrentHashMap<>();
 
     public static SilentCommandManager getInstance() {
         return INSTANCE;
     }
 
-    public CompletableFuture<ArrayList<String>> executeCommand(ProxyPlayerSession player, String commandString, ArrayList<String> expectedResponses) {
+    public CompletableFuture<SilentCommandResult> executeCommand(ProxyPlayerSession player, String commandString, ArrayList<String> expectedResponses) {
         String playerUuid = player.getAuthData().getIdentity().toString();
-        
-        // Create a new task and store it safely
-        CommandTask task = new CommandTask(expectedResponses);
+
+        String formTitle = null;
+        ArrayList<String> textTriggers = new ArrayList<>(expectedResponses);
+
+        if (!textTriggers.isEmpty() && textTriggers.get(0).startsWith(FORM_PREFIX)) {
+            formTitle = textTriggers.remove(0).substring(FORM_PREFIX.length());
+        }
+
+        CompletableFuture<SilentCommandResult> future = new CompletableFuture<>();
+        CommandTask task = new CommandTask(formTitle, textTriggers, future);
         activeTasks.put(playerUuid, task);
 
-        // Build and send the command
         CommandOriginData originData = new CommandOriginData(CommandOriginType.PLAYER, player.getAuthData().getIdentity(), "", 0);
         CommandRequestPacket command = new CommandRequestPacket();
         command.setCommand(commandString);
         command.setCommandOriginData(originData);
         command.setInternal(false);
-        
+
         player.getDownstream().sendPacketImmediately(command);
 
-        // Return the ticket
-        return task.future;
+        return future;
     }
 
     public boolean checkAndComplete(ProxyPlayerSession player, String serverMessage) {
         String playerUuid = player.getAuthData().getIdentity().toString();
 
-        // Single efficient lookup
         CommandTask task = activeTasks.get(playerUuid);
 
-        // If task is null, this player isn't waiting for anything. Pass the packet.
-        if (task == null) {
-            return false; 
+        if (task == null || task.expectedTriggers.isEmpty()) {
+            return false;
         }
 
         boolean matchedThisLine = false;
 
-        // Check if the incoming message matches any of our expected triggers
         for (String expected : task.expectedTriggers) {
             if (serverMessage.contains(expected)) {
                 task.capturedLines.add(serverMessage);
                 matchedThisLine = true;
-                break; // Found our match, stop checking the other triggers!
+                break;
             }
         }
 
-        // If we caught a piece of the command response...
         if (matchedThisLine) {
-            
-            // Did we collect all the parts we were waiting for?
-            if (task.capturedLines.size() >= task.expectedTriggers.size()) {
-                
-                // Remove the task from the map so we don't leak memory
-                activeTasks.remove(playerUuid);
-                
-                // Complete the future. (Notice we DO NOT clear the list here!)
-                task.future.complete(task.capturedLines); 
+            if (task.isDone()) {
+                completeTask(playerUuid, task);
             }
-            
-            return true; // We intercepted this line, tell the proxy to KILL it.
+            return true;
         }
 
         return false;
+    }
+
+    public boolean checkAndCaptureForm(ProxyPlayerSession player, ModalFormRequestPacket formPacket) {
+        String playerUuid = player.getAuthData().getIdentity().toString();
+
+        CommandTask task = activeTasks.get(playerUuid);
+
+        if (task == null || task.expectedFormTitle == null) {
+            return false;
+        }
+
+        try {
+            JsonNode rootNode = JSON_MAPPER.readTree(formPacket.getFormData());
+            JsonNode titleNode = rootNode.get("title");
+
+            log.info(rootNode.toPrettyString());
+
+            if (titleNode != null && titleNode.isTextual()) {
+                String formTitle = titleNode.asText();
+
+                if (formTitle.toLowerCase().contains(task.expectedFormTitle.toLowerCase())) {
+                    task.capturedForm = formPacket;
+                    task.formCaptured = true;
+
+                    if (task.isDone()) {
+                        completeTask(playerUuid, task);
+                    }
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse form JSON for title matching", e);
+        }
+
+        return false;
+    }
+
+    private void completeTask(String playerUuid, CommandTask task) {
+        activeTasks.remove(playerUuid);
+        task.future.complete(new SilentCommandResult(task.capturedLines, task.capturedForm));
     }
 }

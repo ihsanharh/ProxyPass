@@ -1,5 +1,7 @@
 package com.ihsanharh.hiveutils.mods.utils;
 
+import java.util.ArrayList;
+
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
@@ -9,6 +11,7 @@ import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.ModRegistry;
 import com.ihsanharh.hiveutils.core.PlayerStore;
+import com.ihsanharh.hiveutils.core.SilentCommandManager;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -46,6 +49,25 @@ public class DebugMod extends BaseMod {
                         log.info("Mod Name: {}\nEnabled: {}", baseMod.getName(), baseMod.isEnabled());
                     }
                 }
+
+                return ModResult.DENY;
+            }
+
+            if (textMessage.contains("!testform")) {
+                ArrayList<String> expected = new ArrayList<>();
+                expected.add("form:friends");
+                SilentCommandManager.getInstance().executeCommand(session, "/friends", expected)
+                    .thenAccept(result -> {
+                        if (result.form != null) {
+                            log.info("Captured form data: {}", result.form.getFormData());
+                        } else {
+                            log.info("No form captured");
+                        }
+                    })
+                    .exceptionally(ex -> {
+                        log.error("Failed to capture form", ex);
+                        return null;
+                    });
 
                 return ModResult.DENY;
             }

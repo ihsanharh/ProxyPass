@@ -5,7 +5,6 @@ import java.util.Arrays;
 
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
-import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.ModResult;
@@ -25,36 +24,31 @@ public class ServerTrackerMod implements ProxyMod {
 
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
-        SilentCommandManager commandManager = SilentCommandManager.getInstance();
-
-        if (packet instanceof TextPacket textPacket) {
-            if (commandManager.checkAndComplete(session, textPacket.getMessage()))
-                return ModResult.DENY;
-        }
-
         if (packet instanceof PlayerListPacket playerListPacket) {
-            if (playerListPacket.getAction() == PlayerListPacket.Action.ADD
-                    && playerListPacket.getEntries().size() > 1) {
-                commandManager.executeCommand(session, "/connection", expectedResponses)
-                        .thenAccept(response -> {
-                            String serverName = "HUB";
-                            for (String line : response) {
-                                if (line.contains("server name")) {
-                                    serverName = line.substring(line.lastIndexOf(" ") + 1);
-                                    break;
-                                }
-                            }
+            if (playerListPacket.getAction() == PlayerListPacket.Action.ADD && playerListPacket.getEntries().size() > 1) {
+                SilentCommandManager commandManager = SilentCommandManager.getInstance();
 
-                            ServerStore serverStore = ServerStore.getInstance();
-                            serverStore.setCurrentServerName(serverName);
-                            log.info("moved to server: {}", serverName);
-                        })
-                        .exceptionally(ex -> {
-                            log.error("Command execution failed", ex);
-                            return null;
-                        });
+                commandManager.executeCommand(session, "/connection", expectedResponses)
+                .thenAccept(response -> {
+                    String serverName = "HUB";
+
+                    for (String line : response.textLines) {
+                        if (line.contains("server name")) {
+                            serverName = line.substring(line.lastIndexOf(" ") + 1);
+
+                            break;
+                        }
+                    }
+
+                    ServerStore serverStore = ServerStore.getInstance();
+                    serverStore.setCurrentServerName(serverName);
+                    log.info("moved to server: {}", serverName);
+                })
+                .exceptionally(ex -> {
+                    log.error("Command execution failed", ex);
+                    return null;
+                });
             }
-            ;
         }
 
         return ModResult.PASS;

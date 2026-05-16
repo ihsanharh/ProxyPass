@@ -13,6 +13,7 @@ import com.ihsanharh.hiveutils.mods.internal.FormManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.PlayerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.SelfPlayerRemapMod;
 import com.ihsanharh.hiveutils.mods.internal.ServerTrackerMod;
+import com.ihsanharh.hiveutils.mods.internal.SilentCommandMod;
 import com.ihsanharh.hiveutils.mods.utils.DebugMod;
 
 import lombok.extern.log4j.Log4j2;
@@ -48,6 +49,7 @@ public class ModRegistry {
         this.activeMods.add(new PlayerTrackerMod());
         this.activeMods.add(new CommandManagerMod());
         this.activeMods.add(new FormManagerMod());
+        this.activeMods.add(new SilentCommandMod());
 
         /* extra mods - load saved enabled states */
         BaseMod hideAndSeek = new HideAndSeekESP();
