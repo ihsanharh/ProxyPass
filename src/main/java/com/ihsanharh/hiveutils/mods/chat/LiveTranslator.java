@@ -12,7 +12,6 @@ import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.deepl.DeepLScraper.TranslationResult;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ServerChangeListener;
 import com.ihsanharh.hiveutils.core.ServerStore;
 import com.ihsanharh.hiveutils.forms.CustomForm;
 import com.ihsanharh.hiveutils.utils.ChatParser;
@@ -27,7 +26,7 @@ import java.util.regex.Pattern;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class LiveTranslator extends BaseMod implements ServerChangeListener {
+public class LiveTranslator extends BaseMod {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private String target = "";
     private DeepLLang targetLanguage = DeepLLang.ENGLISH_AMERICAN;
@@ -35,7 +34,11 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
     private final Map<String, DeepLLang> globalLangMap = new HashMap<>();
 
     public LiveTranslator() {
-        ServerStore.getInstance().addListener(this);
+        ServerStore.getInstance().addListener((oldServer, newServer) -> {
+            DeepLScraper scraper = DeepLScraper.getInstance();
+            
+            scraper.clearQueue();
+        });
     }
 
     @Override
@@ -66,13 +69,6 @@ public class LiveTranslator extends BaseMod implements ServerChangeListener {
         if (this.target != null && !this.target.isEmpty()) {
             this.parseTargetPlayers(null);
         }
-    }
-
-    @Override
-    public void onServerChange(String oldServer, String newServer) {
-        // DeepLScraper scraper = DeepLScraper.getInstance();
-        // scraper.cancel();
-        // scraper.clearQueue();
     }
 
     @Override

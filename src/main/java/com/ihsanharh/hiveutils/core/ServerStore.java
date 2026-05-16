@@ -2,8 +2,7 @@ package com.ihsanharh.hiveutils.core;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import com.ihsanharh.hiveutils.api.ServerChangeListener;
+import java.util.function.BiConsumer;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -12,7 +11,7 @@ public class ServerStore {
     private static final ServerStore INSTANCE = new ServerStore();
     private String currentServerName = "UNKNOWN";
     private String previousServerName = "UNKNOWN";
-    private final List<ServerChangeListener> listeners = new ArrayList<>();
+    private final List<BiConsumer<String, String>> listeners = new ArrayList<>();
 
     public static ServerStore getInstance() {
         return INSTANCE;
@@ -26,12 +25,12 @@ public class ServerStore {
         return previousServerName;
     }
 
-    public void addListener(ServerChangeListener listener) {
-        this.listeners.add(listener);
+    public void addListener(BiConsumer<String, String> callback) {
+        this.listeners.add(callback);
     }
 
-    public void removeListener(ServerChangeListener listener) {
-        this.listeners.remove(listener);
+    public void removeListener(BiConsumer<String, String> callback) {
+        this.listeners.remove(callback);
     }
 
     public boolean setCurrentServerName(String serverName) {
@@ -42,9 +41,9 @@ public class ServerStore {
         this.previousServerName = this.currentServerName;
         this.currentServerName = serverName;
 
-        for (ServerChangeListener listener : listeners) {
+        for (BiConsumer<String, String> listener : listeners) {
             try {
-                listener.onServerChange(oldServer, serverName);
+                listener.accept(oldServer, serverName);
             } catch (Exception e) {
                 ServerStore.log.error("Listener error", e);
             }
