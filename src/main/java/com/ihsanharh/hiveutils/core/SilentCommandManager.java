@@ -81,8 +81,6 @@ public class SilentCommandManager {
     }
 
     public CompletableFuture<SilentCommandResult> executeCommand(ProxyPlayerSession player, String commandString, ArrayList<String> expectedResponses) {
-        String playerUuid = player.getAuthData().getIdentity().toString();
-
         String formTitle = null;
         ArrayList<String> textTriggers = new ArrayList<>(expectedResponses);
 
