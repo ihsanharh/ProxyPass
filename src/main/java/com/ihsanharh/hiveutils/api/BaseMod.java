@@ -2,14 +2,21 @@ package com.ihsanharh.hiveutils.api;
 
 import java.util.Map;
 
-import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
-import com.ihsanharh.hiveutils.core.ModConfigStore;
-import com.ihsanharh.hiveutils.forms.CustomForm;
+import com.ihsanharh.hiveutils.core.ModContext;
+import com.ihsanharh.hiveutils.core.CustomForm;
 
 public abstract class BaseMod implements ProxyMod {
+    protected ModContext context;
     private boolean enabled = true;
+
+    public void setContext(ModContext ctx) {
+        this.context = ctx;
+    }
+
+    public void onInitialize() {
+    }
 
     public boolean isEnabled() {
         return this.enabled;
@@ -18,14 +25,16 @@ public abstract class BaseMod implements ProxyMod {
     public void setEnabled(boolean enabled) {
         boolean changed = this.enabled != enabled;
         this.enabled = enabled;
-        if (changed) {
-            ModConfigStore.getInstance().setEnabledState(this, enabled);
+        if (changed && context != null) {
+            context.getConfigStore().saveEnabledState(this, enabled);
         }
     }
 
     public void toggle() {
         this.enabled = !this.enabled;
-        ModConfigStore.getInstance().setEnabledState(this, this.enabled);
+        if (context != null) {
+            context.getConfigStore().saveEnabledState(this, this.enabled);
+        }
     }
 
     public String getName() {
@@ -37,16 +46,6 @@ public abstract class BaseMod implements ProxyMod {
     }
 
     public void loadSettings(Map<String, Object> settings) {
-    }
-
-    @Override
-    public ModResult handleUpstream(BedrockPacket packet, ProxyPlayerSession session) {
-        return ModResult.PASS;
-    }
-
-    @Override
-    public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
-        return ModResult.PASS;
     }
 
     public boolean hasSettingsForm() {

@@ -14,16 +14,17 @@ import org.cloudburstmc.proxypass.network.bedrock.session.UpstreamPacketHandler;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ModRegistry;
+import com.ihsanharh.hiveutils.core.ModContext;
 
 public class UpstreamModManager extends UpstreamPacketHandler {
-    private final List<ProxyMod> activeMods;
     private final ProxyServerSession session;
+    private final ModContext context = new ModContext();
+    private final List<ProxyMod> activeMods = context.getMods();
  
     public UpstreamModManager(ProxyServerSession session, ProxyPass proxy, Account account) {
         super(session, proxy, account);
         this.session = session;
-        this.activeMods = ModRegistry.getInstance().getMods();
+        context.register(session);
     }
 
     @Override
@@ -32,6 +33,10 @@ public class UpstreamModManager extends UpstreamPacketHandler {
 
         if (!(packet instanceof LoginPacket) && (playerSession == null || playerSession.getDownstream() == null)) {
             return super.handlePacket(packet);
+        }
+
+        if (playerSession != null) {
+            context.bind(playerSession);
         }
 
         ModResult finalResult = ModResult.PASS;
@@ -44,10 +49,10 @@ public class UpstreamModManager extends UpstreamPacketHandler {
             ModResult result = mod.handleUpstream(packet, this.session.getPlayer());
 
             if (result == ModResult.DENY) {
-                return PacketSignal.HANDLED; // block the packet immediately
+                return PacketSignal.HANDLED;
             }
             if (result == ModResult.MODIFIED) {
-                finalResult = ModResult.MODIFIED; // send the packet manually
+                finalResult = ModResult.MODIFIED;
             }
         }
 
@@ -56,7 +61,7 @@ public class UpstreamModManager extends UpstreamPacketHandler {
         if (finalResult == ModResult.MODIFIED) {
             playerSession.getDownstream().sendPacket(packet);
 
-            return PacketSignal.HANDLED; // we already sent the modified packet, block the original
+            return PacketSignal.HANDLED;
         }
 
         return originalSignal;

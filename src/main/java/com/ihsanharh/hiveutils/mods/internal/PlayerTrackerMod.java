@@ -6,17 +6,17 @@ import org.cloudburstmc.protocol.bedrock.packet.MoveEntityAbsolutePacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.PlayerStore;
 
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class PlayerTrackerMod implements ProxyMod {
+public class PlayerTrackerMod extends BaseMod {
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
-        PlayerStore playerStore = PlayerStore.getInstance();
+        PlayerStore playerStore = context.getPlayerStore();
 
         if (packet instanceof PlayerListPacket playerListPacket) {
             PlayerListPacket.Action action = playerListPacket.getAction();

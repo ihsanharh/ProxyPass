@@ -6,22 +6,22 @@ import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.ConnectedClient;
 
 import java.util.*;
 
 @Log4j2
-public class SelfPlayerRemapMod implements ProxyMod {
-    private static final Map<ProxyPlayerSession, Map<UUID, UUID>> SESSION_REMAPS = Collections.synchronizedMap(new WeakHashMap<>());
+public class SelfPlayerRemapMod extends BaseMod {
+    private final Map<UUID, UUID> remapTable = new HashMap<>();
 
-    private static Map<UUID, UUID> getRemapTable(ProxyPlayerSession session) {
-        return SESSION_REMAPS.computeIfAbsent(session, k -> new HashMap<>());
+    private UUID toFakeUuid(UUID real) {
+        return remapTable.computeIfAbsent(real, k -> UUID.randomUUID());
     }
 
-    private static boolean needsRemap(ProxyPlayerSession session) {
-        ConnectedClient client = ConnectedClient.getInstance();
+    private boolean needsRemap(ProxyPlayerSession session) {
+        ConnectedClient client = context.getConnectedClient();
         if (!client.isConnected()) return false;
 
         String machineUser = client.getUsername();
@@ -29,16 +29,12 @@ public class SelfPlayerRemapMod implements ProxyMod {
         return !machineUser.equalsIgnoreCase(proxyUser);
     }
 
-    private static UUID toFakeUuid(Map<UUID, UUID> table, UUID real) {
-        return table.computeIfAbsent(real, k -> UUID.randomUUID());
-    }
-
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (!needsRemap(session)) return ModResult.PASS;
-        
-        Map<UUID, UUID> remapTable = getRemapTable(session);
-        String clientUsername = ConnectedClient.getInstance().getUsername();
+
+        ConnectedClient client = context.getConnectedClient();
+        String clientUsername = client.getUsername();
 
         if (packet instanceof PlayerListPacket playerListPacket) {
             boolean modified = false;
@@ -50,7 +46,7 @@ public class SelfPlayerRemapMod implements ProxyMod {
                     UUID playerUuid = player.getUuid();
 
                     if (clientUsername.equalsIgnoreCase(player.getName())) {
-                        UUID fakeUuid = toFakeUuid(remapTable, playerUuid);
+                        UUID fakeUuid = toFakeUuid(playerUuid);
 
                         PlayerListPacket.Entry rebuilt = new PlayerListPacket.Entry(fakeUuid);
                         rebuilt.setEntityId(player.getEntityId());

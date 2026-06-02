@@ -1,4 +1,4 @@
-package com.ihsanharh.hiveutils.forms;
+package com.ihsanharh.hiveutils.core;
 
 import lombok.Getter;
 import lombok.Setter;

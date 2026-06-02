@@ -12,13 +12,10 @@ import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.deepl.DeepLScraper.TranslationResult;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.core.ServerStore;
-import com.ihsanharh.hiveutils.forms.CustomForm;
+import com.ihsanharh.hiveutils.core.CustomForm;
 import com.ihsanharh.hiveutils.utils.ChatParser;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,17 +23,17 @@ import java.util.regex.Pattern;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class LiveTranslator extends BaseMod {
+public class TranslateMod extends BaseMod {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private String target = "";
     private DeepLLang targetLanguage = DeepLLang.ENGLISH_AMERICAN;
     private final Map<String, DeepLLang> targetPlayerMap = new HashMap<>();
     private final Map<String, DeepLLang> globalLangMap = new HashMap<>();
 
-    public LiveTranslator() {
-        ServerStore.getInstance().addListener((oldServer, newServer) -> {
+    @Override
+    public void onInitialize() {
+        context.getServerStore().addListener((oldServer, newServer) -> {
             DeepLScraper scraper = DeepLScraper.getInstance();
-            
             scraper.clearQueue();
         });
     }
@@ -95,20 +92,17 @@ public class LiveTranslator extends BaseMod {
             return ModResult.PASS;
         }
 
-        // Ignore messages that are already translated
         if (cleanMessage.endsWith(")") && cleanMessage.contains(" -> ")) {
             return ModResult.PASS;
         }
 
         DeepLLang playerSourceLang = this.targetPlayerMap.get(cleanUsername.toLowerCase());
 
-        // Case 1: Player is specifically targeted
         if (this.targetPlayerMap.containsKey(cleanUsername.toLowerCase())) {
             this.performTargetedTranslation(session, textPacket, parsedChat, cleanMessage, playerSourceLang, this.targetLanguage);
             return ModResult.DENY;
         }
 
-        // Case 2 & 3: Global language filters OR Translate Everything (target is empty)
         boolean hasGlobalFilters = !this.globalLangMap.isEmpty();
         boolean translateAll = this.target.isEmpty();
 
@@ -144,20 +138,16 @@ public class LiveTranslator extends BaseMod {
                 return;
             }
 
-            // Get the Enum directly from the result!
             DeepLLang detectedEnum = translated.detectedLanguage();
 
-            // Failsafe 1: If the detected language is already our target language, skip
             if (detectedEnum != null && detectedEnum == this.targetLanguage) {
                 session.getUpstream().sendPacketImmediately(textPacket);
                 return;
             }
 
-            // Failsafe 2: Evaluate the Global Filter
             boolean passesFilter = translateAll; 
 
             if (!passesFilter && detectedEnum != null) {
-                // Check if the detected language matches any of the (lang) hints we set
                 if (this.globalLangMap.containsKey(detectedEnum.getCode().toLowerCase())) {
                     passesFilter = true;
                 }
@@ -166,7 +156,6 @@ public class LiveTranslator extends BaseMod {
             if (passesFilter) {
                 this.dispatchTranslatedPacket(session, textPacket, parsedChat, cleanMessage, translated);
             } else {
-                // It was translated, but didn't pass the filter
                 session.getUpstream().sendPacketImmediately(textPacket);
             }
         })
@@ -184,7 +173,6 @@ public class LiveTranslator extends BaseMod {
 
         String translatedString = translated.translatedText();
         
-        // Safely get the code directly from the Enum
         String displayLang = (translated.detectedLanguage() != null) 
                 ? translated.detectedLanguage().getCode() 
                 : "??";
@@ -279,7 +267,7 @@ public class LiveTranslator extends BaseMod {
 
         String[] parts = this.target.split(",");
         Pattern pattern = Pattern.compile("^(.*?)(?:\\s*\\((.*?)\\))?$");
-        List<String> validEntries = new ArrayList<>();
+        java.util.List<String> validEntries = new java.util.ArrayList<>();
 
         for (String part : parts) {
             String trimmedPart = part.trim();
@@ -300,7 +288,6 @@ public class LiveTranslator extends BaseMod {
                 }
 
                 if (originalName.isEmpty()) {
-                    // Global Language Filter
                     if (lang != null) {
                         this.globalLangMap.put(lang.getCode().toLowerCase(), lang);
                         validEntries.add("(" + lang.getCode() + ")");
@@ -308,7 +295,6 @@ public class LiveTranslator extends BaseMod {
                         this.sendUserText(session, "§cRemoved invalid global language filter: (" + langStr + "). Please provide a valid language code or name.");
                     }
                 } else {
-                    // PlayerName OR PlayerName (Language)
                     if (langStr != null && !langStr.trim().isEmpty()) {
                         if (lang != null) {
                             this.targetPlayerMap.put(mapName, lang);
@@ -319,7 +305,6 @@ public class LiveTranslator extends BaseMod {
                             this.sendUserText(session, "§cRemoved invalid language hint '" + langStr + "' for player '" + originalName + "'. Fallback to auto-detect.");
                         }
                     } else {
-                        // Valid PlayerName only
                         this.targetPlayerMap.put(mapName, DeepLLang.DETECT_LANGUAGE);
                         validEntries.add(originalName);
                     }

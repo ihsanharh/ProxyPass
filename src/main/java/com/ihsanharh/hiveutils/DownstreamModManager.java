@@ -12,16 +12,25 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ModRegistry;
+import com.ihsanharh.hiveutils.core.ModContext;
 
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class DownstreamModManager extends DownstreamPacketHandler {
-    private final List<ProxyMod> activeMods;
     private final ProxyPlayerSession player;
+    private final List<ProxyMod> activeMods;
 
     public DownstreamModManager(ProxyClientSession session, ProxyPlayerSession player, ProxyPass proxy) {
         super(session, player, proxy);
         this.player = player;
-        this.activeMods = ModRegistry.getInstance().getMods();
+        ModContext ctx = ModContext.forSession(player);
+        if (ctx != null) {
+            this.activeMods = ctx.getMods();
+        } else {
+            log.warn("ModContext not found for downstream, no mods active");
+            this.activeMods = List.of();
+        }
     }
 
     @Override
@@ -36,10 +45,10 @@ public class DownstreamModManager extends DownstreamPacketHandler {
             ModResult result = mod.handleDownstream(packet, player);
 
             if (result == ModResult.DENY) {
-                return PacketSignal.HANDLED; // block the packet immediately
+                return PacketSignal.HANDLED;
             }
             if (result == ModResult.MODIFIED) {
-                finalResult = ModResult.MODIFIED; // send the packet manually
+                finalResult = ModResult.MODIFIED;
             }
         }
 
@@ -48,7 +57,7 @@ public class DownstreamModManager extends DownstreamPacketHandler {
         if (finalResult == ModResult.MODIFIED) {
             this.player.getUpstream().sendPacket(packet);
 
-            return PacketSignal.HANDLED; // we already sent the modified packet, block the original
+            return PacketSignal.HANDLED;
         }
 
         return originalSignal;

@@ -1,4 +1,4 @@
-package com.ihsanharh.hiveutils.forms;
+package com.ihsanharh.hiveutils.core;
 
 import org.cloudburstmc.protocol.bedrock.packet.ModalFormRequestPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
@@ -11,16 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class FormManager {
-    private static final FormManager INSTANCE = new FormManager();
     private final AtomicInteger formIdCounter = new AtomicInteger(100000);
     private final Map<Integer, Consumer<String>> formCallbacks = new ConcurrentHashMap<>();
     private final Map<String, Deque<FormEntry>> playerFormHistory = new ConcurrentHashMap<>();
-
-    private FormManager() {}
-
-    public static FormManager getInstance() {
-        return INSTANCE;
-    }
 
     private record FormEntry(Form form, Consumer<String> callback) {}
 
@@ -37,7 +30,6 @@ public class FormManager {
         int formId = formIdCounter.getAndIncrement();
         formCallbacks.put(formId, response -> {
             if (response == null || response.equals("null") || response.trim().isEmpty()) {
-                // Form was closed/canceled
                 this.handleBack(session);
             } else {
                 onResponse.accept(response);
@@ -55,10 +47,8 @@ public class FormManager {
         Deque<FormEntry> history = this.playerFormHistory.get(xuid);
         
         if (history != null && !history.isEmpty()) {
-            // Remove the current form we just closed
             history.pop();
             
-            // If there's a previous form, show it
             if (!history.isEmpty()) {
                 FormEntry previous = history.peek();
                 this.sendForm(session, previous.form(), previous.callback(), false);

@@ -1,4 +1,4 @@
-package com.ihsanharh.hiveutils.mods.utils;
+package com.ihsanharh.hiveutils.mods.internal;
 
 import java.util.ArrayList;
 
@@ -9,9 +9,6 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ModRegistry;
-import com.ihsanharh.hiveutils.core.PlayerStore;
-import com.ihsanharh.hiveutils.core.SilentCommandManager;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -22,16 +19,10 @@ public class DebugMod extends BaseMod {
         if (packet instanceof TextPacket textPacket) {
             String textMessage = textPacket.getMessage();
 
-            if (textMessage.contains("dxzmap")) {
-                PlayerStore.getInstance().printLiveMap();
-
-                return ModResult.DENY;
-            }
-
             if (textMessage.contains("find ")) {
                 String playerName = textMessage.substring(textMessage.indexOf(" ") + 1);
 
-                log.info(PlayerStore.getInstance().getPlayerByName(playerName));
+                log.info(context.getPlayerStore().getPlayerByName(playerName));
 
                 return ModResult.DENY;
             }
@@ -39,7 +30,7 @@ public class DebugMod extends BaseMod {
             if (textMessage.contains("modlist")) {
                 String modName = textMessage.substring(textMessage.indexOf(" ") + 1);
 
-                for (ProxyMod mod : ModRegistry.getInstance().getMods()) {
+                for (ProxyMod mod : context.getModRegistry().getMods()) {
                     if (mod instanceof BaseMod baseMod) {
                         if (modName.equalsIgnoreCase(baseMod.getName())) {
                             log.info("{} updated", baseMod.getName());
@@ -56,7 +47,7 @@ public class DebugMod extends BaseMod {
             if (textMessage.contains("!testform")) {
                 ArrayList<String> expected = new ArrayList<>();
                 expected.add("form:friends");
-                SilentCommandManager.getInstance().executeCommand(session, "/friends", expected)
+                context.getSilentCommandManager().executeCommand(session, "/friends", expected)
                     .thenAccept(result -> {
                         if (result.form != null) {
                             log.info("Captured form data: {}", result.form.getFormData());

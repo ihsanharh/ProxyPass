@@ -1,4 +1,4 @@
-package com.ihsanharh.hiveutils.mods.hideandseek;
+package com.ihsanharh.hiveutils.mods.games;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,8 +77,8 @@ public class HideAndSeekESP extends BaseMod {
 
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
-        ServerStore serverStore = ServerStore.getInstance();
-        PlayerStore playerStore = PlayerStore.getInstance();
+        ServerStore serverStore = context.getServerStore();
+        PlayerStore playerStore = context.getPlayerStore();
 
         if (!serverStore.getCurrentServerName().contains("HIDE")) {
             if (this.ongoing || !this.nametags.isEmpty()) {

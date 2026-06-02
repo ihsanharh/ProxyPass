@@ -21,28 +21,13 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class ModRegistry {
-    private static final ModRegistry INSTANCE = new ModRegistry();
     private final List<ProxyMod> activeMods;
-    private ModConfigStore configStore;
-    private boolean initialized = false;
+    private final ModContext context;
 
-    static {
-        INSTANCE.ensureInitialized();
-    }
-
-    private ModRegistry() {
+    public ModRegistry(ModContext context) {
+        this.context = context;
         this.activeMods = new ArrayList<>();
-    }
 
-    private void ensureInitialized() {
-        if (this.initialized) return;
-        this.initialized = true;
-
-        this.configStore = ModConfigStore.getInstance();
-        this.configStore.ensureInitialized();
-        this.configStore.load();
-
-        /* mandatory internal mods - registered in specific order */
         registerInternalMod(new ClientInfo());
         registerInternalMod(new ServerTrackerMod());
         registerInternalMod(new SelfPlayerRemapMod());
@@ -51,7 +36,6 @@ public class ModRegistry {
         registerInternalMod(new FormManagerMod());
         registerInternalMod(new SilentCommandMod());
 
-        /* auto-discover external mods */
         autoDiscoverMods();
 
         log.info("Loaded {} mods", this.activeMods.size());
@@ -81,8 +65,8 @@ public class ModRegistry {
                 ProxyMod mod = modClass.getDeclaredConstructor().newInstance();
 
                 if (mod instanceof BaseMod baseMod) {
-                    baseMod.setEnabled(configStore.getEnabledState(baseMod));
-                    configStore.loadSettings(baseMod);
+                    baseMod.setEnabled(context.getConfigStore().getEnabledState(baseMod));
+                    context.getConfigStore().loadSettings(baseMod);
                 }
 
                 this.activeMods.add(mod);
@@ -91,13 +75,6 @@ public class ModRegistry {
                 log.error("Failed to load mod: {}", modClass.getSimpleName(), e);
             }
         }
-    }
-
-    public static ModRegistry getInstance() {
-        if (!INSTANCE.initialized) {
-            INSTANCE.ensureInitialized();
-        }
-        return INSTANCE;
     }
 
     public List<ProxyMod> getMods() {

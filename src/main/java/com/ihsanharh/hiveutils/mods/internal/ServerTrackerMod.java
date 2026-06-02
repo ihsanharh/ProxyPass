@@ -7,15 +7,15 @@ import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.core.ServerStore;
 import com.ihsanharh.hiveutils.core.SilentCommandManager;
 
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class ServerTrackerMod implements ProxyMod {
+public class ServerTrackerMod extends BaseMod {
     private static final ArrayList<String> expectedResponses = new ArrayList<String>(Arrays.asList(
             "You are connected to public IP",
             "You are connected to internal IP",
@@ -26,7 +26,7 @@ public class ServerTrackerMod implements ProxyMod {
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (packet instanceof PlayerListPacket playerListPacket) {
             if (playerListPacket.getAction() == PlayerListPacket.Action.ADD && playerListPacket.getEntries().size() > 1) {
-                SilentCommandManager commandManager = SilentCommandManager.getInstance();
+                SilentCommandManager commandManager = context.getSilentCommandManager();
 
                 commandManager.executeCommand(session, "/connection", expectedResponses)
                 .thenAccept(response -> {
@@ -40,7 +40,7 @@ public class ServerTrackerMod implements ProxyMod {
                         }
                     }
 
-                    ServerStore serverStore = ServerStore.getInstance();
+                    ServerStore serverStore = context.getServerStore();
                     serverStore.setCurrentServerName(serverName);
                     log.info("moved to server: {}", serverName);
                 })

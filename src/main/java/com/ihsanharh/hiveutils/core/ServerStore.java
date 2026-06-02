@@ -8,13 +8,13 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class ServerStore {
-    private static final ServerStore INSTANCE = new ServerStore();
+    private final PlayerStore playerStore;
     private String currentServerName = "UNKNOWN";
     private String previousServerName = "UNKNOWN";
     private final List<BiConsumer<String, String>> listeners = new ArrayList<>();
 
-    public static ServerStore getInstance() {
-        return INSTANCE;
+    public ServerStore(PlayerStore playerStore) {
+        this.playerStore = playerStore;
     }
 
     public String getCurrentServerName() {
@@ -45,12 +45,12 @@ public class ServerStore {
             try {
                 listener.accept(oldServer, serverName);
             } catch (Exception e) {
-                ServerStore.log.error("Listener error", e);
+                log.error("Listener error", e);
             }
         }
 
         if (!this.previousServerName.equals("UNKNOWN")) {
-            PlayerStore.getInstance().clear();
+            playerStore.clear();
         }
 
         return true;

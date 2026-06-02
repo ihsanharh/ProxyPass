@@ -7,16 +7,10 @@ import lombok.Getter;
 
 @Getter
 public class ConnectedClient {
-    private static final ConnectedClient INSTANCE = new ConnectedClient();
-
     private String xuid;
     private UUID uuid;
     private String username;
     private boolean connected = false;
-
-    public static ConnectedClient getInstance() {
-        return INSTANCE;
-    }
 
     public void setClient(String xuid, String username) {
         this.xuid = xuid;

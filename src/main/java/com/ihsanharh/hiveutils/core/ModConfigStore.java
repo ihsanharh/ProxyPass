@@ -15,16 +15,11 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class ModConfigStore {
     private static final String CONFIG_FILE = "hiveutils_mods.json";
-    private static final ModConfigStore INSTANCE = new ModConfigStore();
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final Map<String, Boolean> enabledStates = new HashMap<>();
     private final Map<String, Map<String, Object>> modSettings = new HashMap<>();
     private Path configPath;
     private boolean initialized = false;
-
-    public static ModConfigStore getInstance() {
-        return INSTANCE;
-    }
 
     public synchronized void initialize() {
         if (this.initialized) return;
@@ -38,12 +33,6 @@ public class ModConfigStore {
             load();
         } catch (Exception e) {
             log.error("Could not initialize config, using defaults: {}", e.getMessage());
-        }
-    }
-
-    public void ensureInitialized() {
-        if (!this.initialized) {
-            initialize();
         }
     }
 
@@ -119,13 +108,12 @@ public class ModConfigStore {
         return enabledStates.getOrDefault(mod.getName(), true);
     }
 
-    public void setEnabledState(com.ihsanharh.hiveutils.api.BaseMod mod, boolean enabled) {
+    public void saveEnabledState(com.ihsanharh.hiveutils.api.BaseMod mod, boolean enabled) {
         if (!initialized) {
             log.warn("Config not initialized, cannot save state");
             return;
         }
         enabledStates.put(mod.getName(), enabled);
-        mod.setEnabled(enabled);
         log.info("Saved {} = {}", mod.getName(), enabled);
 
         Map<String, Object> settings = mod.getSettings();

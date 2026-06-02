@@ -3,13 +3,11 @@ package com.ihsanharh.hiveutils.commands;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
 import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ModConfigStore;
-import com.ihsanharh.hiveutils.core.ModRegistry;
+import com.ihsanharh.hiveutils.core.ModContext;
+import com.ihsanharh.hiveutils.core.CustomForm;
+import com.ihsanharh.hiveutils.core.SimpleForm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ihsanharh.hiveutils.forms.CustomForm;
-import com.ihsanharh.hiveutils.forms.FormManager;
-import com.ihsanharh.hiveutils.forms.SimpleForm;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import java.util.List;
@@ -21,7 +19,13 @@ public class ModsCommand extends BaseProxyCommand {
 
     @Override
     public void execute(ProxyPlayerSession session, String[] args) {
-        List<ProxyMod> mods = ModRegistry.getInstance().getMods();
+        ModContext ctx = ModContext.forSession(session);
+        if (ctx == null) {
+            this.sendUserText(session, "§cMod context not available!");
+            return;
+        }
+
+        List<ProxyMod> mods = ctx.getModRegistry().getMods();
 
         SimpleForm mainForm = new SimpleForm("Mod Manager", "Select a mod to configure:");
         for (ProxyMod m : mods) {
@@ -31,7 +35,7 @@ public class ModsCommand extends BaseProxyCommand {
             }
         }
 
-        FormManager.getInstance().sendForm(session, mainForm, responseStr -> {
+        ctx.getFormManager().sendForm(session, mainForm, responseStr -> {
             try {
                 int index = Integer.parseInt(responseStr);
                 int count = 0;
@@ -49,6 +53,9 @@ public class ModsCommand extends BaseProxyCommand {
     }
 
     private void openModSettings(ProxyPlayerSession session, BaseMod mod) {
+        ModContext ctx = ModContext.forSession(session);
+        if (ctx == null) return;
+
         CustomForm modForm = new CustomForm(mod.getName() + " Settings");
         modForm.addToggle("Enabled", mod.isEnabled());
 
@@ -56,7 +63,7 @@ public class ModsCommand extends BaseProxyCommand {
             mod.buildSettingsForm(session, modForm);
         }
 
-        FormManager.getInstance().sendForm(session, modForm, response -> {
+        ctx.getFormManager().sendForm(session, modForm, response -> {
             try {
                 ObjectMapper MAPPER = new ObjectMapper();
                 JsonNode node = MAPPER.readTree(response);
@@ -68,9 +75,9 @@ public class ModsCommand extends BaseProxyCommand {
 
                     if (enabled != wasEnabled || mod.hasSettingsForm() && mod.handleSettingsSubmit(session, response)) {
                         if (enabled != wasEnabled) {
-                            ModConfigStore.getInstance().setEnabledState(mod, enabled);
+                            ctx.getConfigStore().saveEnabledState(mod, enabled);
                         } else if (mod.hasSettingsForm()) {
-                            ModConfigStore.getInstance().saveModSettings(mod, mod.getSettings());
+                            ctx.getConfigStore().saveModSettings(mod, mod.getSettings());
                         }
                         this.sendUserText(session, "§aUpdated settings for " + mod.getName());
                     }

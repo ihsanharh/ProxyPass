@@ -9,9 +9,9 @@ import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.CommandRequestPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
 import com.ihsanharh.hiveutils.api.ProxyCommand;
-import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.commands.FindCommand;
 import com.ihsanharh.hiveutils.commands.ModsCommand;
 import com.ihsanharh.hiveutils.commands.TranslateCommand;
@@ -19,7 +19,7 @@ import com.ihsanharh.hiveutils.commands.TranslateCommand;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class CommandManagerMod implements ProxyMod {
+public class CommandManagerMod extends BaseMod {
     private final Map<String, ProxyCommand> commandRegistry = new HashMap<>();
 
     public CommandManagerMod() {

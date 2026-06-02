@@ -18,8 +18,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.core.ServerStore;
-import com.ihsanharh.hiveutils.core.SilentCommandManager;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -35,8 +33,9 @@ public class FriendTracker extends BaseMod {
     private final AtomicBoolean friendsReady = new AtomicBoolean(false);
     private volatile boolean initialSyncDone = false;
 
-    public FriendTracker() {
-        ServerStore.getInstance().addListener((oldServer, newServer) -> {
+    @Override
+    public void onInitialize() {
+        context.getServerStore().addListener((oldServer, newServer) -> {
             if (currentSession != null) fetchFriends();
         });
     }
@@ -50,7 +49,7 @@ public class FriendTracker extends BaseMod {
         ArrayList<String> expected = new ArrayList<>();
         expected.add("form:friends");
 
-        SilentCommandManager.getInstance().executeCommand(currentSession, "/friends", expected)
+        context.getSilentCommandManager().executeCommand(currentSession, "/friends", expected)
         .thenAccept(result -> {
             if (result.form != null) parseFriendsForm(result.form.getFormData());
         })

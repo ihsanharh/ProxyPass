@@ -4,8 +4,8 @@ import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
-import com.ihsanharh.hiveutils.forms.FormManager;
-import com.ihsanharh.hiveutils.forms.SimpleForm;
+import com.ihsanharh.hiveutils.core.ModContext;
+import com.ihsanharh.hiveutils.core.SimpleForm;
 import com.ihsanharh.deepl.DeepLLang;
 import com.ihsanharh.deepl.DeepLScraper;
 import com.ihsanharh.hiveutils.api.ModResult;
@@ -132,7 +132,6 @@ public class TranslateCommand extends BaseProxyCommand {
         String targetArg = args[0];
         String targetLang = targetArg.contains(" | ") ? targetArg.split(" - ")[0].trim() : targetArg;
 
-        // Case 1: /translate <lang> (Toggle Auto-Translate)
         if (args.length == 1) {
             if (autoTranslateLang != null && targetLang.equalsIgnoreCase(autoTranslateLang.getCode())) {
                 autoTranslateLang = null;
@@ -151,7 +150,6 @@ public class TranslateCommand extends BaseProxyCommand {
             return;
         }
 
-        // Case 2: /translate <lang> <message> (One-time translate
         String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
         DeepLLang target = DeepLLang.fromCodeOrLabel(targetLang);
@@ -186,6 +184,9 @@ public class TranslateCommand extends BaseProxyCommand {
     }
 
     private void showLanguagesForm(ProxyPlayerSession session) {
+        ModContext ctx = ModContext.forSession(session);
+        if (ctx == null) return;
+
         Set<String> addedCodes = new HashSet<>();
         List<DeepLLang> sortedLangs = new ArrayList<>();
         for (DeepLLang lang : DeepLLang.values()) {
@@ -204,7 +205,7 @@ public class TranslateCommand extends BaseProxyCommand {
         }
 
         final List<DeepLLang> finalLangs = sortedLangs;
-        FormManager.getInstance().sendForm(session, form, responseStr -> {
+        ctx.getFormManager().sendForm(session, form, responseStr -> {
             if (responseStr == null || responseStr.isEmpty()) return;
             try {
                 int index = Integer.parseInt(responseStr);

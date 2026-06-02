@@ -3,8 +3,8 @@ package com.ihsanharh.hiveutils.commands;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
 import com.ihsanharh.hiveutils.api.BaseProxyCommand;
+import com.ihsanharh.hiveutils.core.ModContext;
 import com.ihsanharh.hiveutils.core.PlayerData;
-import com.ihsanharh.hiveutils.core.PlayerStore;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -22,7 +22,13 @@ public class FindCommand extends BaseProxyCommand {
         }
 
         String targetName = String.join(" ", args);
-        PlayerData target = PlayerStore.getInstance().getPlayerByName(targetName);
+        ModContext ctx = ModContext.forSession(session);
+        if (ctx == null) {
+            this.sendUserText(session, "§cMod context not available!");
+            return;
+        }
+
+        PlayerData target = ctx.getPlayerStore().getPlayerByName(targetName);
 
         if (target != null) {
             String coords = String.format("X: %.1f, Y: %.1f, Z: %.1f",

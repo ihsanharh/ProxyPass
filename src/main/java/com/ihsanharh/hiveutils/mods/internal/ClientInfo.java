@@ -8,24 +8,23 @@ import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
 import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult.IdentityData;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ConnectedClient;
 
-public class ClientInfo implements ProxyMod {
+public class ClientInfo extends BaseMod {
     @Override
     public ModResult handleUpstream(BedrockPacket packet, ProxyPlayerSession session) {
         if (packet instanceof LoginPacket loginPacket) {
             try {
                 ChainValidationResult chain = EncryptionUtils.validatePayload(loginPacket.getAuthPayload());
                 IdentityData identityData = chain.identityClaims().extraData;
-
-                ConnectedClient.getInstance().setClient(identityData.xuid, identityData.displayName);
+                
+                context.getConnectedClient().setClient(identityData.xuid, identityData.displayName);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         } else if (packet instanceof DisconnectPacket) {
-            ConnectedClient.getInstance().clear();
+            context.getConnectedClient().clear();
         }
 
         return ModResult.PASS;

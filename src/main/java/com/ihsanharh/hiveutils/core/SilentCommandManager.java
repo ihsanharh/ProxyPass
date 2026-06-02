@@ -19,7 +19,6 @@ import java.util.Map;
 
 @Log4j2
 public class SilentCommandManager {
-    private static final SilentCommandManager INSTANCE = new SilentCommandManager();
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
     private static final String FORM_PREFIX = "form:";
     private static final long COMMAND_DELAY_MS = 2000;
@@ -75,10 +74,6 @@ public class SilentCommandManager {
     private final ConcurrentLinkedQueue<QueuedCommand> globalQueue = new ConcurrentLinkedQueue<>();
     private volatile long lastCommandTime = 0L;
     private volatile boolean processing = false;
-
-    public static SilentCommandManager getInstance() {
-        return INSTANCE;
-    }
 
     public CompletableFuture<SilentCommandResult> executeCommand(ProxyPlayerSession player, String commandString, ArrayList<String> expectedResponses) {
         String formTitle = null;
