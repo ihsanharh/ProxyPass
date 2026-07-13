@@ -1,5 +1,8 @@
 package com.ihsanharh.hiveutils.mods.internal;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
+import com.ihsanharh.hiveutils.api.ModResult;
+
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.DisconnectPacket;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
@@ -7,9 +10,6 @@ import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult;
 import org.cloudburstmc.protocol.bedrock.util.EncryptionUtils;
 import org.cloudburstmc.protocol.bedrock.util.ChainValidationResult.IdentityData;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
-
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
 
 public class ClientInfo extends BaseMod {
     @Override

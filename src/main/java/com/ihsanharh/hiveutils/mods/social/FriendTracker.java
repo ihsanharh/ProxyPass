@@ -1,5 +1,17 @@
 package com.ihsanharh.hiveutils.mods.social;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihsanharh.hiveutils.api.BaseMod;
+import com.ihsanharh.hiveutils.api.ModResult;
+import com.ihsanharh.hiveutils.utils.TextPacketUtils;
+
+import lombok.extern.log4j.Log4j2;
+
+import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
+import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
+import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
+
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
@@ -8,18 +20,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
-import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
-import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
-import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
-
-import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class FriendTracker extends BaseMod {
@@ -102,15 +102,7 @@ public class FriendTracker extends BaseMod {
     }
 
     private void notify(String message) {
-        if (currentSession != null) {
-            TextPacket textPacket = new TextPacket();
-            textPacket.setType(TextPacket.Type.RAW);
-            textPacket.setNeedsTranslation(false);
-            textPacket.setMessage(message);
-            textPacket.setXuid("");
-
-            currentSession.getUpstream().sendPacket(textPacket);
-        }
+        TextPacketUtils.sendRawToClient(currentSession, message);
     }
 
     private void processPlayerListPacket(PlayerListPacket packet) {

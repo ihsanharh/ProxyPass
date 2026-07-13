@@ -1,9 +1,9 @@
 package com.ihsanharh.hiveutils.core;
 
+import lombok.Getter;
+
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-
-import lombok.Getter;
 
 @Getter
 public class ConnectedClient {

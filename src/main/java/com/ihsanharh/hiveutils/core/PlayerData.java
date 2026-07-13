@@ -2,6 +2,7 @@ package com.ihsanharh.hiveutils.core;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+
 import org.cloudburstmc.math.vector.Vector3f;
 
 @Data

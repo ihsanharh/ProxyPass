@@ -10,7 +10,6 @@ public class PlayerStore {
     private final Map<String, PlayerData> byName = new ConcurrentHashMap<>();
     private final Map<Long, PlayerData> byEntityId = new ConcurrentHashMap<>();
     private final Map<Long, PlayerData> byRuntimeId = new ConcurrentHashMap<>();
-    private Boolean clearable = false;
 
     public void addPlayer(String uuid, String playerName, long entityId) {
         this.addPlayer(uuid, playerName, entityId, 0, Vector3f.ZERO);
@@ -50,20 +49,6 @@ public class PlayerStore {
         }
     }
 
-    public void removePlayerByEntityId(long entityId) {
-        PlayerData removed = this.byEntityId.remove(entityId);
-
-        if (removed != null)
-            this.removePlayer(removed.getUuid());
-    }
-
-    public void removePlayerByRuntimeId(long runtimeId) {
-        PlayerData removed = this.byRuntimeId.remove(runtimeId);
-
-        if (removed != null)
-            this.removePlayer(removed.getUuid());
-    }
-
     public PlayerData getPlayer(String uuid) {
         return byUuid.get(uuid);
     }
@@ -72,23 +57,11 @@ public class PlayerStore {
         return byRuntimeId.get(runtimeId);
     }
 
-    public PlayerData getPlayerByEntityId(long entityId) {
-        return byEntityId.get(entityId);
-    }
-
     public PlayerData getPlayerByName(String playerName) {
         return byName.get(playerName.toLowerCase());
     }
 
-    public Boolean toggleClearable() {
-        this.clearable = !this.clearable;
-        return this.clearable;
-    }
-
     public void clear() {
-        if (!clearable)
-            return;
-
         byUuid.clear();
         byName.clear();
         byEntityId.clear();

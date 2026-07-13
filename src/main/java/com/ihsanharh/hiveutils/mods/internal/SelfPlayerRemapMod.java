@@ -1,16 +1,20 @@
 package com.ihsanharh.hiveutils.mods.internal;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
+import com.ihsanharh.hiveutils.api.ModResult;
+import com.ihsanharh.hiveutils.core.ConnectedClient;
+
 import lombok.extern.log4j.Log4j2;
+
 import org.cloudburstmc.protocol.bedrock.packet.AddPlayerPacket;
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.PlayerListPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.core.ConnectedClient;
-
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Log4j2
 public class SelfPlayerRemapMod extends BaseMod {

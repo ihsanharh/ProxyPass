@@ -2,8 +2,10 @@ package com.ihsanharh.hiveutils.core;
 
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ProxyMod;
+
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
+
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyServerSession;
 
@@ -24,6 +26,9 @@ public class ModContext {
     private final FormManager formManager;
     private final ModRegistry modRegistry;
     private final List<ProxyMod> mods;
+
+    private volatile ProxyPlayerSession playerSession;
+    private volatile ProxyServerSession clientSession;
 
     public ModContext() {
         log.info("Initializing ModContext...");
@@ -50,10 +55,12 @@ public class ModContext {
     }
 
     public void register(ProxyServerSession upstream) {
+        this.clientSession = upstream;
         CONTEXTS.put(upstream, this);
     }
 
     public void bind(ProxyPlayerSession session) {
+        this.playerSession = session;
         if (CONTEXTS.putIfAbsent(session, this) == null) {
             CONTEXTS.remove(session.getUpstream());
         }

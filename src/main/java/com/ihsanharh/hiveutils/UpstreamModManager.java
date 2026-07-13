@@ -1,6 +1,8 @@
 package com.ihsanharh.hiveutils;
 
-import java.util.List;
+import com.ihsanharh.hiveutils.api.ModResult;
+import com.ihsanharh.hiveutils.core.ModContext;
+import com.ihsanharh.hiveutils.core.ModPacketHandler;
 
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.LoginPacket;
@@ -11,20 +13,21 @@ import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyServerSession;
 import org.cloudburstmc.proxypass.network.bedrock.session.UpstreamPacketHandler;
 
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.api.ProxyMod;
-import com.ihsanharh.hiveutils.core.ModContext;
-
 public class UpstreamModManager extends UpstreamPacketHandler {
     private final ProxyServerSession session;
     private final ModContext context = new ModContext();
-    private final List<ProxyMod> activeMods = context.getMods();
- 
+    private final ModPacketHandler modHandler;
+
     public UpstreamModManager(ProxyServerSession session, ProxyPass proxy, Account account) {
         super(session, proxy, account);
         this.session = session;
         context.register(session);
+        this.modHandler = new ModPacketHandler(context.getMods()) {
+            @Override
+            protected String getCurrentServerName() {
+                return context.getServerStore().getCurrentServerName();
+            }
+        };
     }
 
     @Override
@@ -39,28 +42,16 @@ public class UpstreamModManager extends UpstreamPacketHandler {
             context.bind(playerSession);
         }
 
-        ModResult finalResult = ModResult.PASS;
+        ModResult modResult = modHandler.processMods(packet, mod -> mod.handleUpstream(packet, this.session.getPlayer()));
 
-        for (ProxyMod mod : activeMods) {
-            if (mod instanceof BaseMod baseMod && !baseMod.isEnabled()) {
-                continue;
-            }
-
-            ModResult result = mod.handleUpstream(packet, this.session.getPlayer());
-
-            if (result == ModResult.DENY) {
-                return PacketSignal.HANDLED;
-            }
-            if (result == ModResult.MODIFIED) {
-                finalResult = ModResult.MODIFIED;
-            }
+        if (modResult == ModResult.DENY) {
+            return PacketSignal.HANDLED;
         }
 
         PacketSignal originalSignal = super.handlePacket(packet);
 
-        if (finalResult == ModResult.MODIFIED) {
+        if (modResult == ModResult.MODIFIED) {
             playerSession.getDownstream().sendPacket(packet);
-
             return PacketSignal.HANDLED;
         }
 

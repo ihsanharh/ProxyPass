@@ -1,23 +1,24 @@
 package com.ihsanharh.hiveutils.core;
 
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import org.reflections.Reflections;
-
 import com.ihsanharh.hiveutils.api.BaseMod;
 import com.ihsanharh.hiveutils.api.ProxyMod;
 import com.ihsanharh.hiveutils.mods.internal.ClientInfo;
-import com.ihsanharh.hiveutils.mods.internal.CommandManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.FormManagerMod;
+import com.ihsanharh.hiveutils.mods.internal.ModsManagerMod;
 import com.ihsanharh.hiveutils.mods.internal.PlayerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.SelfPlayerRemapMod;
 import com.ihsanharh.hiveutils.mods.internal.ServerTrackerMod;
 import com.ihsanharh.hiveutils.mods.internal.SilentCommandMod;
 
 import lombok.extern.log4j.Log4j2;
+
+import org.reflections.Reflections;
+
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Log4j2
 public class ModRegistry {
@@ -32,7 +33,7 @@ public class ModRegistry {
         registerInternalMod(new ServerTrackerMod());
         registerInternalMod(new SelfPlayerRemapMod());
         registerInternalMod(new PlayerTrackerMod());
-        registerInternalMod(new CommandManagerMod());
+        registerInternalMod(new ModsManagerMod());
         registerInternalMod(new FormManagerMod());
         registerInternalMod(new SilentCommandMod());
 
@@ -66,7 +67,25 @@ public class ModRegistry {
 
                 if (mod instanceof BaseMod baseMod) {
                     baseMod.setEnabled(context.getConfigStore().getEnabledState(baseMod));
+
+                    List<String> defaults = baseMod.getDefaultServerFilters();
+                    if (defaults != null) {
+                        baseMod.setServerFilters(defaults);
+                    }
+
                     context.getConfigStore().loadSettings(baseMod);
+
+                    Map<String, Object> settings = context.getConfigStore().getModSettings(baseMod);
+                    if (settings.containsKey("serverFilters")) {
+                        Object filters = settings.get("serverFilters");
+                        if (filters instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<String> list = (List<String>) filters;
+                            baseMod.setServerFilters(list);
+                        } else if (filters instanceof String) {
+                            baseMod.setServerFilters(List.of((String) filters));
+                        }
+                    }
                 }
 
                 this.activeMods.add(mod);

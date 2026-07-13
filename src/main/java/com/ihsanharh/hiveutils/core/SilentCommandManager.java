@@ -1,20 +1,21 @@
 package com.ihsanharh.hiveutils.core;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.extern.log4j.Log4j2;
+
 import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginData;
 import org.cloudburstmc.protocol.bedrock.data.command.CommandOriginType;
 import org.cloudburstmc.protocol.bedrock.packet.CommandRequestPacket;
 import org.cloudburstmc.protocol.bedrock.packet.ModalFormRequestPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
-import lombok.extern.log4j.Log4j2;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Log4j2
@@ -75,7 +76,7 @@ public class SilentCommandManager {
     private volatile long lastCommandTime = 0L;
     private volatile boolean processing = false;
 
-    public CompletableFuture<SilentCommandResult> executeCommand(ProxyPlayerSession player, String commandString, ArrayList<String> expectedResponses) {
+    public CompletableFuture<SilentCommandResult> executeCommand(ProxyPlayerSession player, String commandString, List<String> expectedResponses) {
         String formTitle = null;
         ArrayList<String> textTriggers = new ArrayList<>(expectedResponses);
 
@@ -126,10 +127,10 @@ public class SilentCommandManager {
         command.setCommandOriginData(originData);
         command.setInternal(false);
 
-        queued.player.getDownstream().sendPacketImmediately(command);
+        queued.player.getDownstream().sendPacket(command);
         lastCommandTime = System.currentTimeMillis();
 
-        log.debug("Sent queued command: {}", queued.commandString);
+        log.debug("[SilentCommandManager] Executing queued command: {}", queued.commandString);
 
         if (!globalQueue.isEmpty()) {
             CompletableFuture.delayedExecutor(COMMAND_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS).execute(() -> {

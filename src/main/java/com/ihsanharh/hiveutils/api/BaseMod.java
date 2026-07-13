@@ -1,15 +1,17 @@
 package com.ihsanharh.hiveutils.api;
 
-import java.util.Map;
+import com.ihsanharh.hiveutils.core.ModContext;
+import com.ihsanharh.hiveutils.core.CustomForm;
 
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
-import com.ihsanharh.hiveutils.core.ModContext;
-import com.ihsanharh.hiveutils.core.CustomForm;
+import java.util.List;
+import java.util.Map;
 
 public abstract class BaseMod implements ProxyMod {
     protected ModContext context;
     private boolean enabled = true;
+    private List<String> serverFilters;
 
     public void setContext(ModContext ctx) {
         this.context = ctx;
@@ -56,5 +58,30 @@ public abstract class BaseMod implements ProxyMod {
 
     public boolean handleSettingsSubmit(ProxyPlayerSession session, String response) {
         return true;
+    }
+
+    public List<String> getServerFilters() {
+        return serverFilters;
+    }
+
+    public void setServerFilters(List<String> serverFilters) {
+        this.serverFilters = serverFilters;
+    }
+
+    public List<String> getDefaultServerFilters() {
+        return null;
+    }
+
+    public boolean matchesServer(String serverName) {
+        if (serverFilters == null || serverFilters.isEmpty()) return true;
+        if (serverName == null) return false;
+
+        String lower = serverName.toLowerCase();
+
+        for (String filter : serverFilters) {
+            if (lower.contains(filter.toLowerCase())) return true;
+        }
+
+        return false;
     }
 }

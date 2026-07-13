@@ -1,17 +1,46 @@
 package com.ihsanharh.hiveutils.core;
 
+import lombok.extern.log4j.Log4j2;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-import lombok.extern.log4j.Log4j2;
-
 @Log4j2
 public class ServerStore {
     private final PlayerStore playerStore;
-    private String currentServerName = "UNKNOWN";
+    private volatile String currentServerName = "UNKNOWN";
     private String previousServerName = "UNKNOWN";
-    private final List<BiConsumer<String, String>> listeners = new ArrayList<>();
+    private final List<FilteredListener> listeners = new ArrayList<>();
+
+    private static class FilteredListener {
+        final List<String> filters;
+        final BiConsumer<String, String> callback;
+
+        FilteredListener(List<String> filters, BiConsumer<String, String> callback) {
+            this.filters = filters;
+            this.callback = callback;
+        }
+
+        boolean matches(String serverName) {
+            if (filters == null || filters.isEmpty()) {
+                return true;
+            }
+            if (serverName == null) {
+                return false;
+            }
+
+            String lower = serverName.toLowerCase();
+
+            for (String filter : filters) {
+                if (lower.contains(filter.toLowerCase())) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 
     public ServerStore(PlayerStore playerStore) {
         this.playerStore = playerStore;
@@ -26,26 +55,33 @@ public class ServerStore {
     }
 
     public void addListener(BiConsumer<String, String> callback) {
-        this.listeners.add(callback);
+        addListener(null, callback);
+    }
+
+    public void addListener(List<String> filters, BiConsumer<String, String> callback) {
+        this.listeners.add(new FilteredListener(filters, callback));
     }
 
     public void removeListener(BiConsumer<String, String> callback) {
-        this.listeners.remove(callback);
+        this.listeners.removeIf(listener -> listener.callback == callback);
     }
 
     public boolean setCurrentServerName(String serverName) {
         if (this.currentServerName.equals(serverName)) {
             return false;
         }
-        String oldServer = this.previousServerName;
+        
+        String oldServer = this.currentServerName;
         this.previousServerName = this.currentServerName;
         this.currentServerName = serverName;
 
-        for (BiConsumer<String, String> listener : listeners) {
+        for (FilteredListener listener : listeners) {
             try {
-                listener.accept(oldServer, serverName);
+                if (listener.matches(serverName) || listener.matches(oldServer)) {
+                    listener.callback.accept(oldServer, serverName);
+                }
             } catch (Exception e) {
-                log.error("Listener error", e);
+                log.error("[ServerStore] Listener error", e);
             }
         }
 
@@ -53,6 +89,7 @@ public class ServerStore {
             playerStore.clear();
         }
 
+        log.debug("[ServerStore] {} -> {}", oldServer, serverName);
         return true;
     }
 }

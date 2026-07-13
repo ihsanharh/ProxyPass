@@ -1,16 +1,16 @@
 package com.ihsanharh.hiveutils.core;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.extern.log4j.Log4j2;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class ModConfigStore {
@@ -105,6 +105,7 @@ public class ModConfigStore {
             log.warn("Config not initialized, returning default: true");
             return true;
         }
+
         return enabledStates.getOrDefault(mod.getName(), true);
     }
 
@@ -113,6 +114,7 @@ public class ModConfigStore {
             log.warn("Config not initialized, cannot save state");
             return;
         }
+
         enabledStates.put(mod.getName(), enabled);
         log.info("Saved {} = {}", mod.getName(), enabled);
 
@@ -127,6 +129,7 @@ public class ModConfigStore {
 
     public void loadSettings(com.ihsanharh.hiveutils.api.BaseMod mod) {
         if (!initialized) return;
+
         Map<String, Object> settings = modSettings.get(mod.getName());
         if (settings != null && !settings.isEmpty()) {
             mod.loadSettings(settings);
@@ -136,6 +139,7 @@ public class ModConfigStore {
 
     public void saveModSettings(com.ihsanharh.hiveutils.api.BaseMod mod, Map<String, Object> settings) {
         if (!initialized) return;
+        
         modSettings.put(mod.getName(), settings);
         log.info("Saved settings for {}", mod.getName());
         save();

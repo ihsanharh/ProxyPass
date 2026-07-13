@@ -39,7 +39,7 @@ public class FormManager {
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.setFormId(formId);
         packet.setFormData(form.toJson());
-        session.getUpstream().sendPacketImmediately(packet);
+        session.getUpstream().sendPacket(packet);
     }
 
     public void handleBack(ProxyPlayerSession session) {
@@ -63,5 +63,9 @@ public class FormManager {
             return true;
         }
         return false;
+    }
+
+    public void removePlayer(ProxyPlayerSession session) {
+        playerFormHistory.remove(session.getAuthData().getXuid());
     }
 }

@@ -1,11 +1,11 @@
 package com.ihsanharh.hiveutils.mods.internal;
 
+import com.ihsanharh.hiveutils.api.BaseMod;
+import com.ihsanharh.hiveutils.api.ModResult;
+
 import org.cloudburstmc.protocol.bedrock.packet.BedrockPacket;
 import org.cloudburstmc.protocol.bedrock.packet.ModalFormResponsePacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
-
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
 
 public class FormManagerMod extends BaseMod {
     @Override

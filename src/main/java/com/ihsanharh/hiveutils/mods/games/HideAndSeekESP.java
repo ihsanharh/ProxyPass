@@ -1,8 +1,12 @@
 package com.ihsanharh.hiveutils.mods.games;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
+import com.ihsanharh.hiveutils.api.BaseMod;
+import com.ihsanharh.hiveutils.api.ModResult;
+import com.ihsanharh.hiveutils.core.PlayerData;
+import com.ihsanharh.hiveutils.core.PlayerStore;
+import com.ihsanharh.hiveutils.utils.TextPacketUtils;
+
+import lombok.extern.log4j.Log4j2;
 
 import org.cloudburstmc.math.vector.Vector2f;
 import org.cloudburstmc.math.vector.Vector3f;
@@ -16,19 +20,35 @@ import org.cloudburstmc.protocol.bedrock.packet.RemoveEntityPacket;
 import org.cloudburstmc.protocol.bedrock.packet.TextPacket;
 import org.cloudburstmc.proxypass.network.bedrock.session.ProxyPlayerSession;
 
-import com.ihsanharh.hiveutils.api.BaseMod;
-import com.ihsanharh.hiveutils.api.ModResult;
-import com.ihsanharh.hiveutils.core.PlayerData;
-import com.ihsanharh.hiveutils.core.PlayerStore;
-import com.ihsanharh.hiveutils.core.ServerStore;
-
-import lombok.extern.log4j.Log4j2;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Log4j2
 public class HideAndSeekESP extends BaseMod {
     private Map<String, Long> players = new ConcurrentHashMap<>();
     private Map<Long, Long> nametags = new ConcurrentHashMap<>();
-    private Boolean ongoing = false;
+    private volatile boolean ongoing = false;
+
+    @Override
+    public List<String> getDefaultServerFilters() {
+        return List.of("HIDE");
+    }
+
+    @Override
+    public void onInitialize() {
+        context.getServerStore().addListener(getServerFilters(), (oldServer, newServer) -> {
+            ongoing = false;
+            ProxyPlayerSession session = context.getPlayerSession();
+            
+            cleanup(session);
+            if (session != null) {
+                TextPacketUtils.sendRawToClientImmediately(session, "[HideAndSeekESP] enabled in this server.");
+            }
+        });
+    }
 
     private void spawnNametag(ProxyPlayerSession session, Long runtimeId, String text, Vector3f position) {
         long entityId = runtimeId + ThreadLocalRandom.current().nextLong(66043, 76043 + 1);
@@ -66,34 +86,34 @@ public class HideAndSeekESP extends BaseMod {
     }
 
     private void cleanup(ProxyPlayerSession session) {
-        for (Long runtimeId : this.nametags.keySet()) {
-            this.despawnNametag(session, runtimeId);
+        int playerCount = this.players.size();
+        int nametagCount = this.nametags.size();
+
+        if (session != null) {
+            for (Long runtimeId : new ArrayList<>(this.nametags.keySet())) {
+                try {
+                    this.despawnNametag(session, runtimeId);
+                } catch (Exception e) {
+                    log.debug("[HideAndSeekESP] Failed to despawn nametag during cleanup", e);
+                }
+            }
         }
 
         this.players.clear();
 
-        log.info("hide and seek cleaned up: {} players & {} nametags", this.players.size(), this.nametags.size());
+        log.debug("[HideAndSeekESP] cleaned up: {} players & {} nametags", playerCount, nametagCount);
     }
 
     @Override
     public ModResult handleDownstream(BedrockPacket packet, ProxyPlayerSession session) {
-        ServerStore serverStore = context.getServerStore();
         PlayerStore playerStore = context.getPlayerStore();
-
-        if (!serverStore.getCurrentServerName().contains("HIDE")) {
-            if (this.ongoing || !this.nametags.isEmpty()) {
-                this.ongoing = false;
-                this.cleanup(session);
-            }
-
-            return ModResult.PASS;
-        }
 
         if (packet instanceof AddPlayerPacket addPlayerPacket) {
             PlayerData player = playerStore.getPlayer(addPlayerPacket.getRuntimeEntityId());
 
-            if (player == null)
+            if (player == null) {
                 return ModResult.PASS;
+            }
 
             Long playerRuntimeId = player.getRuntimeId();
 
@@ -114,23 +134,26 @@ public class HideAndSeekESP extends BaseMod {
         if (packet instanceof RemoveEntityPacket removeEntityPacket) {
             PlayerData player = playerStore.getPlayer(removeEntityPacket.getUniqueEntityId());
 
-            if (player != null && this.ongoing)
-                this.spawnNametag(session, removeEntityPacket.getUniqueEntityId(), player.getPlayerName(),
-                        player.getPosition());
+            if (player == null || !players.containsKey(player.getUuid().toString())) {
+                return ModResult.PASS;
+            }
+            if (this.ongoing) {
+                this.spawnNametag(session, removeEntityPacket.getUniqueEntityId(), player.getPlayerName(), player.getPosition());
+            }
         }
 
         if (packet instanceof TextPacket textPacket) {
-            if (textPacket.getType() != TextPacket.Type.RAW)
+            if (textPacket.getType() != TextPacket.Type.RAW) {
                 return ModResult.PASS;
+            }
 
             String lowercasedMsg = textPacket.getMessage().toLowerCase();
 
-            if (lowercasedMsg.contains("seconds until seekers released!")) {
+            if (!this.ongoing && lowercasedMsg.contains("seconds until seekers released")) {
+                log.debug("[HideAndSeekESP] Game started.");
                 this.ongoing = true;
-                if (this.ongoing)
-                    log.info("hide and seek started.");
             } else if (this.ongoing && lowercasedMsg.contains("game over")) {
-                log.info("hide and seek ended.");
+                log.debug("[HideAndSeekESP] Game ended.");
                 this.ongoing = false;
                 this.cleanup(session);
             }
@@ -141,8 +164,10 @@ public class HideAndSeekESP extends BaseMod {
                 for (PlayerListPacket.Entry player : playerListPacket.getEntries()) {
                     String uuid = player.getUuid().toString();
                     Long runtimeId = players.remove(uuid);
-                    if (runtimeId != null)
+
+                    if (runtimeId != null) {
                         this.despawnNametag(session, runtimeId);
+                    }
                 }
             }
         }
