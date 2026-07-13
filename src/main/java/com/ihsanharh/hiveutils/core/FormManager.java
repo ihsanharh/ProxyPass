@@ -21,7 +21,7 @@ public class FormManager {
         this.sendForm(session, form, onResponse, true);
     }
 
-    private void sendForm(ProxyPlayerSession session, Form form, Consumer<String> onResponse, boolean addToHistory) {
+    public void sendForm(ProxyPlayerSession session, Form form, Consumer<String> onResponse, boolean addToHistory) {
         String xuid = session.getAuthData().getXuid();
         if (addToHistory) {
             this.playerFormHistory.computeIfAbsent(xuid, k -> new ArrayDeque<>()).push(new FormEntry(form, onResponse));
