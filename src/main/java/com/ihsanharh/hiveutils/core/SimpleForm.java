@@ -23,6 +23,10 @@ public class SimpleForm extends Form {
         this.buttons.add(new Button(text));
     }
 
+    public void addButton(String text, String imageUrl) {
+        this.buttons.add(new Button(text, imageUrl));
+    }
+
     @Override
     public String getType() {
         return type;
@@ -32,9 +36,26 @@ public class SimpleForm extends Form {
     @Setter
     public static class Button {
         private String text;
+        private FormImage image; // Null by default, so GSON/Jackson will ignore it if empty
 
         public Button(String text) {
             this.text = text;
+        }
+
+        public Button(String text, String imageUrl) {
+            this.text = text;
+            this.image = new FormImage(imageUrl);
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class FormImage {
+        private String type = "url";
+        private String data;
+
+        public FormImage(String data) {
+            this.data = data;
         }
     }
 }
